@@ -1,4 +1,8 @@
 @import '@fontsource/gochi-hand/latin-400.css';
+@import '@fontsource/outfit/latin-400.css';
+@import '@fontsource/outfit/latin-500.css';
+@import '@fontsource/outfit/latin-600.css';
+@import '@fontsource/outfit/latin-700.css';
 
 :root {
   --ink: #232323;
@@ -9,7 +13,7 @@
   --text-secondary: #6B6455;
   --line-soft: #E9DFC4;
   --accent-blue: #A8DDF5;
-  --font-ui: Inter, 'Segoe UI', sans-serif;
+  --font-ui: Outfit, 'Segoe UI', sans-serif;
   --font-ducky: 'Gochi Hand', cursive;
   color-scheme: light;
   font-family: var(--font-ui);
