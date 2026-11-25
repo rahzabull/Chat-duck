@@ -6,6 +6,8 @@ describe('IPC allowlist and payload validation', () => {
     expect(validatePayload(CHANNELS.dragStart, { x: 120, y: 240 })).toBe(true);
     expect(validatePayload(CHANNELS.hitTest, true)).toBe(true);
     expect(validatePayload(CHANNELS.getState, undefined)).toBe(true);
+    expect(validatePayload(CHANNELS.testAI, undefined)).toBe(true);
+    expect(validatePayload(CHANNELS.testAI, { host: 'example.com' })).toBe(false);
     expect(validatePayload(CHANNELS.command, 'settings')).toBe(true);
     expect(validatePayload(CHANNELS.animationComplete, 'landing')).toBe(true);
     expect(validatePayload(CHANNELS.updateSettings, { mute: true })).toBe(true);

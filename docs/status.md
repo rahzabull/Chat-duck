@@ -1,5 +1,84 @@
 # Ducky implementation status
 
+## Milestone 2 — Local hybrid brain (2026-11-25)
+
+This section supersedes historical claims below that no AI is connected or that
+click dialogue waits 500 ms. No git commit, dependency addition, model download,
+MCP call or real Ollama request was made by Codex for this implementation.
+Claude separately ran the real-model bake-off described below.
+
+| Feature | Implemented | Unit-tested | Verified on desktop |
+| --- | --- | --- | --- |
+| Main-only Ollama version/tags/chat, fixed 127.0.0.1 host, numeric port, no redirects | Yes | Fake fetch: options, success, errors, deadlines, abort, one active transport | Pending Claude |
+| Disabled-by-default settings, preferred installed model selection, manual connection/sample test | Yes | Settings persistence, schemas and main lifecycle; visual controls pending | Pending Claude |
+| Background 60 s warmup, 2.5 s warm deadline, ten-minute keep-alive, automatic offline/cold-load recovery | Yes | Fake timers: backoff, single warmup, pause/hide cancellation and resume | Pending Claude |
+| Immediate built-in physical reactions; AI-first slow/ambient routing after director gates | Yes | Routing and mocked controller, including click under 100 ms and sustained hold | Pending Claude |
+| Same-situation examples, bounded recent dialogue, allowlisted context and sanitized app name | Yes | Prompt builder across every eligible situation | Pending Claude |
+| JSON/shape/text/observation/profanity/repetition/time validation; fragment removal; quote cleanup; enum defaults; model silence | Yes | Rule-by-rule tests | Round-1 repeat rejection verified by Claude; new rules pending desktop |
+| New-event cancellation and stale-result discard, including non-cooperative fake providers | Yes | Request tokens and controller transitions | Pending Claude |
+| Pause/hide/sleep/privacy/fullscreen/disable/revoke/quit cancellation | Yes | Main lifecycle and mocked Electron | Pending Claude |
+| Settings/tray connected versus built-in indicator | Yes | Main status transitions; native UI inspection pending | Pending Claude |
+| No output execution, independent renderer animation/physics, unchanged CSP | Yes | Static boundaries, build, controller tests; live traffic/performance pending | Pending Claude |
+
+Verification for this revision:
+
+- `npm run typecheck`: passed.
+- `npm test`: 363 passed in 17 files; two existing opt-in native-awareness tests
+  in one file skipped. The manual Ollama bake-off is excluded from the default run.
+- `npm run build`: passed (main, preload, companion and settings bundles).
+- `git diff --check`: clean. Renderer bundles contain no Ollama transport.
+- Codex's automated tests use fake providers/fetch; real Ollama was not contacted
+  during this revision. Desktop recovery acceptance and frame smoothness remain
+  pending; Claude's earlier model measurement follows.
+
+Claude's real-model bake-off (round-1 validator, actual prompt builder + provider +
+validator; original results `.codex-logs/bakeoff.txt`):
+
+- `qwen3:8b`: **22/28 valid**, approximately **235 ms warm**; clearly funnier.
+- `gemma3:4b`: **16/28 valid**; flat delivery and invented clock time
+  ("Twelve thirty" when context said `14:20`).
+- The validator correctly rejected repeats. These are Claude's measurements,
+  not a new bake-off or evidence that round-2 validation has been measured live.
+- Default selection when AI is enabled and the saved model is empty or missing:
+  first installed of `qwen3:8b`, `qwen3:4b`, `gemma3:4b`, otherwise the first model
+  returned by `/api/tags`. An installed saved choice is preserved. Automatic
+  selection is saved and shown in Settings; no models are downloaded.
+- The script now lives at `tests/manual/ollama-bakeoff.test.ts`, is opt-in via
+  `DUCKY_OLLAMA_BAKEOFF=1`, and writes to an environment-specified path or OS temp.
+  Normal tests exclude it; see `testing.md` for the command.
+
+Decisions and limitations:
+
+- Optional AI follow-up beats for instant reactions are omitted. Existing authored
+  follow-ups and validated ambient AI `then` beats still work.
+- Added short authored examples to small situation pools so each AI-eligible pool
+  supplies 4–6 distinct examples. The model is told not to copy them or infer facts
+  from them. Heuristic validation cannot prove every claim is true; voice quality
+  and unsupported observations beyond the explicit blacklist need desktop review.
+- New click reactions use a zero-delay timer instead of the old 500 ms debounce.
+  Double-click still opens Settings; its first reaction may already be visible.
+- A long hold now interrupts pickup speech/cooldown before the director decides,
+  so sustained-drag dialogue can actually run during a typical hold.
+- Connection failures enter `offline` and use built-in lines while `/api/version`
+  retries after 15 s, 30 s, 60 s, then every 120 s. Success refreshes installed
+  models and re-warms before returning to `connected`. Retries stop when AI is
+  disabled, hidden, paused, otherwise suspended, or disposed. A 2.5 s inference
+  timeout falls back for that line and enters `warming`, with one background
+  warmup at a time; it does not report an error. Warmup timeouts retry with backoff.
+- Fullscreen/private-app cancellation depends on the existing opt-in helper and
+  its polling interval. Self/unknown foreground samples clear context without
+  blocking Settings diagnostics; private samples suspend AI without exposing an
+  app identity. Cancellation stops the client; Ollama GPU cancellation is unverified.
+- Recent displayed dialogue is bounded RAM-only history, cleared at privacy
+  boundaries. This is not persistent memory or an open-ended chat interface.
+- Existing Vite CommonJS/native-config warning remains non-fatal.
+
+Desktop acceptance for Claude: enable each installed model; inspect connection
+status/sample; trigger thoughts, app comments, hover linger and long holds; release
+or change apps during inference; pause/hide/disable during a cold load; stop Ollama
+mid-session; confirm built-in reactions, automatic reconnection, cold-load recovery, repetition quality,
+renderer smoothness and immediate clicks/double-click Settings behavior.
+
 The personality and opt-in app-awareness update below supersedes the corresponding
 Milestone 1 dialogue/fullscreen limitations. Earlier desktop results remain
 historical; they do not verify the new interaction behavior.

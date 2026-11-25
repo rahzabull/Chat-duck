@@ -31,6 +31,7 @@ export function registerIPC(controller: CompanionController, getSettings: () => 
     ipcMain.on(channel, listener); disposers.push(() => ipcMain.removeListener(channel, listener));
   }
   handle(CHANNELS.getState, () => controller.state);
+  handle(CHANNELS.testAI, () => controller.testAI());
   handle(CHANNELS.updateSettings, payload => { controller.updateSettings(payload as Partial<EditableSettings>); return controller.state; });
   handle(CHANNELS.command, payload => command(payload as Command));
   handle(CHANNELS.dragStart, payload => controller.startDrag(payload as Point), true);

@@ -1,4 +1,4 @@
-# Milestone 1 architecture
+# Ducky architecture (Milestones 1–2)
 
 The main process owns all position, movement, behaviour and persistent state.
 The sandboxed renderer presents that state. Pure TypeScript core modules have no
@@ -22,10 +22,14 @@ Electron imports and are tested with synthetic clocks, RNGs and display layouts.
 | `src/core/behaviour` | Weighted idle/look/sit/walk decisions with injectable clock and RNG |
 | `src/core/events` | Typed bus for all section-28 event names |
 | `src/core/interruptions` | One visible speech slot, priority/cooldown/mute/block rules, no backlog |
-| `src/core/dialogue` | Category pools excluding the last three selections |
+| `src/core/dialogue` | Situation policies, weighted authored pools, last-twelve template exclusion, interaction context |
 | `src/animation` | Replaceable adapter contract and self-contained SVG implementation; Rive README only |
 | `src/shared` | Settings/IPC types, defaults, channel names and strict validators |
-| `src/ai/providers/index.ts` | Type-only M2 provider/proposal contract; no runtime provider |
+| `src/ai/providers` | Electron-free provider request/interface contracts |
+| `src/ai/ollama` | Fixed loopback HTTP transport, schema, deadlines and aborts; instantiated only by main |
+| `src/ai/prompts` | Allowlisted context, sanitized app names, same-situation examples and recent dialogue |
+| `src/ai/response-validation` | JSON/shape, text, observation, profanity and repetition validation; enum defaults |
+| `src/main/ai/HybridBrain.ts` | Model lifecycle, diagnostics, single-request ownership, hybrid routing and stale-result tokens |
 
 ## Window and coordinate model
 
@@ -87,8 +91,9 @@ updates allow hit-testing even when the window ignores clicks.
 On pointer-down, the renderer captures the pointer and main records a grab offset.
 Main stops walking immediately, then waits for four DIP of cursor movement before
 entering picked-up state. Releases/capture loss/blur terminate the drag once. A
-short velocity history feeds physics. Single-click reactions wait 500 ms so native
-double-click can cancel their annoyance counts and open Settings.
+short velocity history feeds physics. Click reactions now run on the next timer
+turn (no 500 ms debounce) to meet the instant-reaction target. Native double-click
+still opens Settings; its first click may already have spoken.
 
 ## Timers and event handling
 
@@ -107,11 +112,49 @@ double-click can cancel their annoyance counts and open Settings.
 `EventBus` defines every brief section-28 event. M1 emits app start/resume, character
 hover/click/pickup/drop/landing, user idle/return, and animation completion. The
 controller subscribes to interaction/landing/idle events to drive reactions and
-speech. Future task, awareness and AI events are types only. No event invokes AI in M1.
+speech. App-awareness situations feed the same director. AI routing happens only
+after its chance/cooldown decision and the interruption preflight accept speech.
 
-The speech slot rejects new messages while occupied, including high priority;
-there is no hidden queue to replay later. High priority bypasses cooldown when
-the slot is empty, but never bypasses pause/hide/sleep/top-edge suppression.
+The speech slot permits higher-priority speech to replace lower-priority speech;
+equal/lower priority is rejected. There is no backlog. High priority bypasses
+cooldown, but never pause/hide/sleep/top-edge suppression. Sustained dragging starts
+a new interaction, interrupting pickup speech/cooldown before the director decides.
+
+## Hybrid AI flow
+
+```text
+Interaction / ambient timer / permitted app sample (MAIN)
+  -> invalidate older dialogue token
+  -> DialogueDirector chance + situation cooldown + curated fallback selection
+  -> SpeechQueue preflight (priority, mute, visibility, sleep, screen edge)
+  -> rejected/silent: no AI call
+  -> instant situation OR AI disabled/warming/error: show curated line immediately
+  -> eligible slow situation and warm AI:
+       allowlisted context + 4–6 same-situation examples + last 8 spoken beats
+       -> MAIN fetch -> http://127.0.0.1:<numeric port>/api/chat
+       -> 2.5-second deadline / cancellation / generation + situation recheck
+       -> JSON and text validator, repetition against last 20 displayed beats
+       -> shouldSpeak:false: silence
+       -> invalid/error/timeout: curated fallback (only while still valid)
+       -> valid: speech + allowed emotion/animation
+       -> SpeechQueue recheck -> renderer bubble text / adapter
+
+Settings -> validated IPC -> MAIN status/tags -> 60-second tiny warmup
+  -> Connected / Warming up / Built-in fallback status -> Settings + tray
+Test connection -> same serialized main provider -> validated sample in Settings
+Pause/hide/sleep/privacy/AI disable -> abort transport + invalidate lifecycle token
+New event/app switch/drag release/hover exit -> abort dialogue + invalidate token
+```
+
+The model never controls physics, event creation, cooldowns, priority or execution.
+The renderer imports no AI transport and the CSP is unchanged. Warmup does not
+block the event loop; ordinary events use built-in lines while loading. There is
+no polling or automatic retry loop after errors: Test connection, changing the
+model/settings, or resuming from suspension reconnects. Model keep-alive is ten
+minutes; an unloaded model may hit the warm deadline on a later event and fall
+back until reconnected. Optional AI follow-ups for instant reactions are omitted;
+authored `then` and validated ambient AI `then` beats use the existing 1.5–2.5 s
+replacement timing. Only actually displayed beats enter the bounded RAM history.
 
 ## Security boundary
 
@@ -126,15 +169,17 @@ the first-launch flag.
 Windows block navigation, redirects, popups and webview attachment. The session
 denies permissions and downloads. Production requests are limited to local
 resources; development additionally permits the configured Vite loopback origin
-and its WebSocket. There is no Node networking code, shell execution or external
-content. CSP denies inline scripts, objects, forms and arbitrary resource origins.
+and its WebSocket. Main's new network client is the fixed-origin Ollama provider;
+it rejects redirects and never accepts a host/URL from settings, context or output.
+The existing awareness helper runs a fixed authored PowerShell/C# script; model
+output never reaches it. CSP denies inline scripts, objects, forms and arbitrary resource origins.
 Inline styles are allowed for SVG/CSS adapter properties and React styles.
 
 ## Later milestones
 
 | Milestone | Attachment point; not implemented in M1 |
 | --- | --- |
-| M2: brain | Implement `AIProvider` in `src/ai/providers` and an optional local transport in `src/ai/ollama`; validate proposals, discard aborted/stale results, then pass permitted speech through `SpeechQueue` |
+| M2: brain | Implemented above; real-model quality and desktop responsiveness pending Claude |
 | M3: personality | Add pure emotion/personality state and memory interfaces; extend scheduler weights and dialogue selection through the bus |
 | M4: awareness | Add separately permission-gated collectors under `src/awareness`; emit typed events without changing physics/renderers |
 | M5: productivity | Add `src/main/database` SQLite repository and `src/main/scheduler` durable reminder service; task/reminder/focus events feed existing interruption rules |
@@ -143,5 +188,5 @@ Inline styles are allowed for SVG/CSS adapter properties and React styles.
 | M8: release | Installer/signing, resource budgets, long-duration testing, crash recovery and security/accessibility review |
 
 Future productivity timers must have their own lifetime: hiding the companion
-must not implicitly stop reminders. There is no database, reminder scheduler,
-awareness collector, or local AI connection in this build.
+must not implicitly stop reminders. There is no task database or reminder
+scheduler. Opt-in awareness and local AI are implemented.

@@ -9,5 +9,8 @@ export default defineConfig({
       '@animation': resolve(__dirname, 'src/animation'),
     },
   },
-  test: { include: ['tests/**/*.test.ts'], environment: 'node' },
+  test: {
+    include: process.env.DUCKY_OLLAMA_BAKEOFF === '1' ? ['tests/**/*.test.ts'] : ['tests/*.test.ts'],
+    environment: 'node',
+  },
 });

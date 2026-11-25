@@ -37,7 +37,11 @@ export class DuckyTray {
       { type: 'separator' }, { label: 'Quit', click: () => this.command('quit') },
     ]);
   }
-  refresh(): void { this.tray.setContextMenu(this.menu()); }
+  refresh(): void {
+    const brain = this.state().brain;
+    this.tray.setToolTip(`Ducky — ${brain.phase === 'connected' ? brain.message : 'Built-in lines active'}`);
+    this.tray.setContextMenu(this.menu());
+  }
   popup(): void { this.menu().popup(); }
   dispose(): void { this.tray.destroy(); }
 }

@@ -1,5 +1,36 @@
 # Testing
 
+## Milestone 2 local AI
+
+`npm test` uses fake providers/fetch and fake timers for local AI. It covers
+offline recovery (15 s, 30 s, 60 s, then every 120 s), cancellation while hidden
+or paused, cold-load re-warming, installed-model defaults, and response validation.
+The normal include pattern is `tests/*.test.ts`, excluding `tests/manual/`.
+
+The real-model bake-off is `tests/manual/ollama-bakeoff.test.ts`. It uses the
+actual prompt builder, Ollama provider and validator against local Ollama on
+port 11434. Install `qwen3:8b` and `gemma3:4b` yourself before running it; the
+script does not download models. It requires `DUCKY_OLLAMA_BAKEOFF=1` both to
+include manual tests and to enable the test itself:
+
+```powershell
+$env:DUCKY_OLLAMA_BAKEOFF = '1'
+$env:DUCKY_OLLAMA_BAKEOFF_OUTPUT = Join-Path ([System.IO.Path]::GetTempPath()) 'ducky-bakeoff.txt'
+try { npm test -- tests/manual/ollama-bakeoff.test.ts }
+finally {
+  Remove-Item Env:\DUCKY_OLLAMA_BAKEOFF
+  Remove-Item Env:\DUCKY_OLLAMA_BAKEOFF_OUTPUT
+}
+```
+
+`DUCKY_OLLAMA_BAKEOFF_OUTPUT` is optional; without it the script writes a
+timestamped `ducky-ollama-bakeoff-*.txt` in the OS temp directory. It prints the
+output path. The supplied output file is overwritten; its parent must exist.
+The run makes 28 requests per model and excludes each model's first request
+from the warm latency average. Cold-load requests retain the production 2.5 s
+deadline; warm the models first when comparing steady-state response quality.
+See `status.md` for Claude's round-1 measurements, which predate round-2 validation.
+
 ## Curated personality and optional app awareness
 
 Current automated result: **145 passed**, with two native Windows checks skipped

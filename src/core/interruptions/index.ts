@@ -8,10 +8,13 @@ export class SpeechQueue {
   private nextAllowed = 0;
   private followUp?: { text: string; at: number; cooldownMs: number };
   constructor(private clock = Date.now) {}
-  offer(text: string, priority: Priority, options: SpeechOptions): boolean {
+  canOffer(priority: Priority, options: SpeechOptions): boolean {
     this.tick();
-    if (!text || options.blocked || (options.fullscreen && priority !== 'high') || (options.muted && priority === 'low')) return false;
-    if (this.current ? rank[priority] <= rank[this.current.priority] : priority !== 'high' && this.clock() < this.nextAllowed) return false;
+    if (options.blocked || (options.fullscreen && priority !== 'high') || (options.muted && priority === 'low')) return false;
+    return !(this.current ? rank[priority] <= rank[this.current.priority] : priority !== 'high' && this.clock() < this.nextAllowed);
+  }
+  offer(text: string, priority: Priority, options: SpeechOptions): boolean {
+    if (!text || !this.canOffer(priority, options)) return false;
     this.followUp = undefined;
     this.current = { text, priority, expiresAt: this.clock() + speechDuration(text) };
     if (options.then) {

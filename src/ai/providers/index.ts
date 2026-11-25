@@ -1,17 +1,12 @@
-import type { AnimationId, EmotionId } from '../../animation/adapter';
-import type { Priority } from '../../core/interruptions';
-
-/** M2 extension contract only. No provider, transport, or inference exists in M1. */
-export interface CharacterProposal {
-  shouldSpeak: boolean;
-  dialogue: string;
-  animation: AnimationId;
-  emotion: EmotionId;
-  priority: Priority;
-  cooldownSeconds: number;
+export interface AIRequest {
+  model: string;
+  messages: readonly { role: 'system' | 'user'; content: string }[];
+  warmup?: boolean;
 }
+/** Only the main process instantiates a provider. Output remains untrusted. */
 export interface AIProvider {
-  readonly id: string;
-  generate(context: Readonly<{ prompt: string; recentDialogue: readonly string[] }>, signal: AbortSignal): Promise<CharacterProposal>;
-  dispose(): Promise<void>;
+  status(): Promise<{ version: string }>;
+  listModels(): Promise<string[]>;
+  generate(request: AIRequest, signal: AbortSignal): Promise<string>;
+  cancel(): void;
 }

@@ -93,6 +93,7 @@ export const LINES: Record<Situation, Line[]> = {
     { text: 'Fine. I forgive you.', then: 'Mostly.' },
     { text: 'Okay, we\'re good. Don\'t make it weird.' },
     { text: 'I\'ve calmed down. I did some breathing.' },
+    { text: 'Truce. Keep the poking to yourself, though.' },
   ],
 
   pickup: [
@@ -158,6 +159,7 @@ export const LINES: Record<Situation, Line[]> = {
     { text: 'I had the weirdest dream. You were a sandwich.' },
   ],
   sleepy_late: [
+    { text: 'My hat is staying up later than it should.' },
     { text: 'It\'s really late, you know.' },
     { text: '*yawn* Are we still doing this?' },
     { text: 'Normal people are asleep right now. Just saying.' },
@@ -187,10 +189,14 @@ export const LINES: Record<Situation, Line[]> = {
     { text: 'I\'ve decided to be mysterious from now on.', then: '...' },
   ],
   thought_morning: [
+    { text: 'Morning already? I need a slower clock.' },
+    { text: 'I have no plans. Starting early on those.' },
     { text: 'Morning. Did you eat something? Not bread. Leave the bread.' },
     { text: 'It\'s too early for anything. Even for me, and I do nothing.' },
   ],
   thought_late: [
+    { text: 'My thoughts get weirder after midnight. Fair warning.' },
+    { text: 'Bed sounds good. Shame about all this standing.' },
     { text: 'It\'s past midnight. Everything feels philosophical now.' },
     { text: 'Late-night thought: what if the hat is wearing me?' },
   ],
@@ -210,62 +216,87 @@ export const LINES: Record<Situation, Line[]> = {
     { text: 'You\'ve been in {app} so long I forgot what your face looks like.' },
   ],
   app_code: [
+    { text: '{app}. I can offer moral support. Very little else.' },
     { text: 'Oh, we\'re coding. I\'ll be quiet.', then: 'Mostly.' },
     { text: 'Coding time. Want me to stare at the bugs with you?' },
     { text: 'Ah, {app}. Where semicolons go missing.' },
   ],
   app_code_long: [
+    { text: 'Still in {app}. My contribution remains mostly decorative.' },
+    { text: '{minutes} minutes. I admire the sitting commitment.' },
     { text: '{minutes} minutes of code. Have you tried turning it off and on again?' },
     { text: 'You\'ve been in {app} a while. Drink some water. Bugs can wait.' },
   ],
   app_design: [
+    { text: '{app}. I have opinions if you need unqualified ones.' },
     { text: 'Ooh, {app}. Make something pretty.' },
     { text: 'Design time. Put a duck in it. Trust me.' },
     { text: '{app}, huh. Are we pushing rectangles around again?' },
   ],
   app_design_long: [
+    { text: 'Still in {app}. I respect a stubborn streak.' },
+    { text: '{minutes} minutes. My hat could use that much attention.' },
     { text: '{minutes} minutes in {app}. The rectangle\'s perfect. I promise.' },
     { text: 'What if you moved it two pixels to the left?', then: 'Kidding. Please don\'t.' },
   ],
   app_video_edit: [
+    { text: '{app}. I brought absolutely no useful skills.' },
+    { text: 'I can sit here looking interested. That helps, presumably.' },
     { text: 'Video editing. Is it rendering? It\'s always rendering.' },
     { text: 'Ooh, {app}. Am I in this one?' },
   ],
   app_3d: [
+    { text: '{app}. More dimensions than I know what to do with.' },
+    { text: 'I could supervise. My rates are mostly bread.' },
     { text: 'Blender, huh. Are you making a 3D duck? Be honest.' },
     { text: 'If that\'s a donut tutorial, I want a bite.' },
   ],
   app_ai: [
+    { text: '{app}. Does it have a hat? Thought so.' },
+    { text: 'I offer a different service. Standing here.' },
     { text: 'Talking to another AI? I\'m right here, you know.' },
     { text: '{app}, huh. Is it smarter than me?', then: 'Don\'t answer that.' },
     { text: 'Ask it if ducks are cool. I\'ll wait.' },
   ],
   app_office: [
+    { text: '{app}. I should probably pretend to have a job.' },
+    { text: 'Put me down as an observer. Unpaid, obviously.' },
     { text: 'Ooh, serious work. I\'ll look busy too.' },
     { text: 'Spreadsheets? Documents? Either way, I\'m proud of you.' },
   ],
   app_files: [
+    { text: '{app}. I trust you have a plan.' },
+    { text: 'I could help, but my qualifications are mostly feathers.' },
     { text: 'Looking for something? I didn\'t move it. Probably.' },
     { text: 'File hunting. Check the Downloads folder. It\'s always the Downloads folder.' },
   ],
   app_terminal: [
+    { text: '{app}. I will stand a respectful distance away.' },
+    { text: 'You handle that. I have standing around to finish.' },
     { text: 'Ooh, the hacker window.' },
     { text: 'Typing commands. Very cool. Very scary.' },
   ],
   app_music: [
+    { text: '{app}. My dancing is available on request.' },
+    { text: 'I have rhythm. Somewhere. Probably in the other foot.' },
     { text: 'Ooh, music. Play something I can dance to.' },
     { text: 'Is this your sad playlist? Be honest.' },
   ],
   app_switching: [
+    { text: 'Are we settling anywhere? My attention needs a chair.' },
     { text: 'You\'re switching apps a lot. Everything okay?' },
     { text: 'Your attention span and I have a lot in common.' },
     { text: 'Okay, which one are we doing? I can\'t keep up.' },
   ],
   app_generic_long: [
+    { text: 'Still in {app}. I admire the loyalty.' },
+    { text: '{minutes} minutes. We should probably stretch something.' },
     { text: '{minutes} minutes in {app}. Stretch your legs. I\'ll watch your stuff.' },
     { text: 'You\'ve been in {app} for a while. Blink, maybe?' },
   ],
   late_night_working: [
+    { text: 'This late? Even my imaginary shift is over.' },
+    { text: 'I would offer coffee, but I lack several qualifications.' },
     { text: 'It\'s {time}. Even I have better work-life balance, and I\'m unemployed.' },
     { text: 'Still working at {time}? Go to bed. I\'ll keep the screen warm.' },
   ],

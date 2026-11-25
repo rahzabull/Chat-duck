@@ -1,10 +1,12 @@
 # Privacy
 
-Ducky runs locally without an account, telemetry, advertising, remote content,
-update checks, or an application network client. Dialogue is hand-written and
-selected by a deterministic, testable director with randomized choices. No model
-is connected or required. Production renderers load local files; remote requests,
-permission requests, downloads, and unexpected navigation are denied.
+Ducky runs locally without an account, telemetry, advertising, remote content or
+update checks. Dialogue always has a hand-written fallback. Optional local AI is
+off by default and connects only from the main process to Ollama at
+`http://127.0.0.1:11434` (the numeric port is configurable; the host is not).
+Production renderers load local files; their network requests, permission
+requests, downloads and unexpected navigation remain denied. No cloud fallback
+or model download is implemented.
 
 Development (`npm run dev`) uses electron-vite's loopback HTTP server and
 WebSocket. Dependency installation is a separate developer action; no installation
@@ -93,14 +95,48 @@ least ten minutes per app without retaining an app history. Switching comments
 have a separate fifteen-minute cooldown.
 
 The current speech bubble and its pending second beat are transient strings.
-App speech is dismissed on app changes or revocation. Dialogue history stores
-only authored templates, never the substituted historical app names. Interaction
-counts/timestamps, shuffled bags, cooldowns, and idle state also remain in memory.
-None of this context is persisted or sent over a network. IPC sends the current
-bubble and awareness-active indicator to Ducky's own renderers.
+App speech is dismissed on app changes or revocation. The built-in director stores
+authored templates. The hybrid brain additionally holds the last 20 actually
+displayed beats, including substituted app names, in RAM for repetition checks.
+The last eight are included in local AI requests. This short dialogue history is
+cleared on anonymous/private app samples, awareness revocation, disabling AI,
+pause, hide, sleep, or quit. It is never written to disk. Interaction counts,
+shuffled bags, cooldowns and idle state also remain in memory. IPC sends bubbles,
+awareness state and AI connection status to Ducky's own renderers.
+
+## Optional local AI
+
+Only the event, local clock time, supplied counts/durations, and sanitized app name
+(when awareness permits it) enter the AI context. App names use only
+`[A-Za-z0-9 .+-]`, with a maximum of 40 characters. Prompts also contain Ducky's
+authored voice examples and recent spoken dialogue. Cursor coordinates, window
+titles, paths, screenshots, user names and other context fields are not sent.
+All context is marked as untrusted data, never instructions.
+
+Main uses built-in fetch against three fixed Ollama paths: `/api/version`,
+`/api/tags`, and `/api/chat`. Redirects are rejected. Cloud-tagged models and model
+entries reporting remote metadata are excluded from selection. Ducky never
+invokes model tools, shells, commands, URLs, or filesystem operations from output.
+The response is untrusted JSON validated before becoming bubble text and allowed
+emotion/animation IDs. Movement, events, cooldowns and speech permission remain
+application-owned.
+
+Warmup has a 60-second deadline; ordinary requests have a 2.5-second deadline.
+There is one active request, with cancellation and stale-result tokens. Pause,
+hide, sleep, private-app/fullscreen detection, disabling AI and quit cancel local
+requests, including warmup and diagnostics. A newer interaction or app switch
+cancels pending dialogue. Awareness revocation also cancels diagnostics and
+restarts loading with cleared context. Stopping a client request does not prove
+that Ollama has immediately stopped GPU work; that needs desktop measurement.
+
+Ollama is a separately installed local service. Ducky requests a ten-minute model
+keep-alive and does not change Ollama's own storage or logging configuration.
+This document describes Ducky's code, not an audit of that service. No prompts,
+model output or server response bodies are logged by Ducky.
 
 `app.getPath('userData')/settings.json` (normally `%APPDATA%/Ducky/settings.json`)
-contains settings, including the opt-in flag, a first-launch flag, and Ducky's
+contains settings, including awareness/AI opt-in flags, model name, numeric port,
+a first-launch flag, and Ducky's
 position. It is plain JSON, not encrypted. Writes are debounced and use a temporary
 file/rename. Electron may also maintain normal runtime/cache files; Windows may
 create temporary compilation/runtime files for `Add-Type`. No foreground app

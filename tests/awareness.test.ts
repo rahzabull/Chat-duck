@@ -4,7 +4,7 @@ import { AppSessionTracker, mapExe, parseForegroundLine } from '../src/core/awar
 describe('foreground parsing and privacy', () => {
   it('accepts one bounded exe/flag record, rejects garbage and never accepts paths or titles', () => {
     expect(parseForegroundLine('chrome.exe|0\r')).toEqual({ app: { name: 'Chrome', category: 'browser' }, fullscreen: false });
-    expect(parseForegroundLine('private|1')).toEqual({ app: null, fullscreen: true });
+    expect(parseForegroundLine('private|1')).toEqual({ app: null, fullscreen: true, private: true });
     for (const line of ['', 'garbage', 'chrome.exe|2', 'chrome.exe|0|title', 'C:\\chrome.exe|0', 'chrome.exe|0\ncode.exe|0', 'x'.repeat(110) + '.exe|0', 'x<script>.exe|0'])
       expect(parseForegroundLine(line)).toBeNull();
   });

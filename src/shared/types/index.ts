@@ -12,13 +12,24 @@ export interface Settings {
   reducedMotion: boolean;
   mute: boolean;
   appAwareness: boolean;
+  aiEnabled: boolean;
+  aiModel: string;
+  ollamaPort: number;
   firstLaunchDone: boolean;
   position: Point | null;
 }
 export type EditableSettings = Omit<Settings, 'firstLaunchDone' | 'position'>;
+export interface BrainState {
+  phase: 'disabled' | 'offline' | 'warming' | 'connected' | 'error' | 'suspended';
+  message: string;
+  models: string[];
+  version?: string;
+  sample?: string;
+}
 export interface CompanionState {
   visible: boolean; paused: boolean; sleeping: boolean; dragging: boolean;
   awarenessActive: boolean;
+  brain: BrainState;
   animation: string; animationRevision: number; emotion: string; direction: Direction; movementSpeed: number;
   bubble: string | null; settings: Settings; debugHitbox: boolean; version: string;
 }
@@ -26,6 +37,7 @@ export interface CursorUpdate { cursor: Point; origin: Point }
 export type Command = 'show' | 'hide' | 'pause' | 'mute' | 'reset' | 'settings' | 'quit';
 export interface DuckyAPI {
   getState(): Promise<CompanionState>;
+  testAI(): Promise<void>;
   updateSettings(patch: Partial<EditableSettings>): Promise<CompanionState>;
   command(command: Command): Promise<void>;
   hitTest(interactive: boolean): void;

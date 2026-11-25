@@ -1,7 +1,7 @@
 import type { SituationEvent } from '../dialogue/context';
 export type AppCategory = 'browser' | 'code' | 'design' | 'video_edit' | '3d' | 'ai' | 'office' | 'files' | 'terminal' | 'music' | 'other';
 export interface ForegroundApp { name: string; category: AppCategory }
-export interface ForegroundSample { app: ForegroundApp | null; fullscreen: boolean }
+export interface ForegroundSample { app: ForegroundApp | null; fullscreen: boolean; private?: boolean }
 // Also embedded into the helper so private names never cross its stdout pipe.
 export const PRIVATE_EXE_PATTERN = '^(1password|bitwarden|keepass.*|lastpass|dashlane|whatsapp|telegram|signal|discord.*|slack|teams|ms-teams|msteams|messenger|zoom.*|consent|credentialuibroker|lockapp|logonui|.*bank.*|chase|revolut|wise|paypal|paytm|phonepe|gpay|yono.*|icici.*|hdfc.*|kotak.*|axis.*)(\\.exe)?$';
 const privateExe = new RegExp(PRIVATE_EXE_PATTERN, 'i');
@@ -25,7 +25,8 @@ export function mapExe(exe: string): ForegroundApp | null {
 }
 export function parseForegroundLine(line: string): ForegroundSample | null {
   const match = /^([a-zA-Z0-9][a-zA-Z0-9 ._+()-]{0,100}\.exe|private|unknown|self)\|([01])$/.exec(line.trim());
-  return match ? { app: mapExe(match[1]), fullscreen: match[2] === '1' } : null;
+  return match ? { app: mapExe(match[1]), fullscreen: match[2] === '1',
+    ...(match[1] === 'private' || privateExe.test(match[1]) ? { private: true } : {}) } : null;
 }
 /** No previous app names: only current identity, session timing and switch timestamps. */
 export class AppSessionTracker {

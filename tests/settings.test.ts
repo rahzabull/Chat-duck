@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, isSettingsPatch, parseSettings } from '../src/shared/schemas/settings';
 describe('settings schema', () => {
+  it('defaults AI off and validates model and numeric loopback port on disk and IPC', () => {
+    expect(parseSettings({})).toMatchObject({ aiEnabled: false, aiModel: '', ollamaPort: 11434 });
+    expect(parseSettings({ aiEnabled: true, aiModel: 'gemma3:4b', ollamaPort: 12000 })).toMatchObject({ aiEnabled: true, aiModel: 'gemma3:4b', ollamaPort: 12000 });
+    expect(isSettingsPatch({ aiEnabled: true, aiModel: 'qwen3:8b', ollamaPort: 12000 })).toBe(true);
+    expect(isSettingsPatch({ aiModel: '' })).toBe(true);
+    for (const ollamaPort of [0, 65536, NaN, 11434.5, '11434', 'evil.example']) {
+      expect(isSettingsPatch({ ollamaPort })).toBe(false); expect(parseSettings({ ollamaPort }).ollamaPort).toBe(11434);
+    }
+    for (const aiModel of [null, 3, 'x'.repeat(201), 'bad\nmodel', '<script>']) expect(isSettingsPatch({ aiModel })).toBe(false);
+    expect(isSettingsPatch({ ollamaHost: 'example.com' })).toBe(false);
+    expect(isSettingsPatch({ aiEnabled: 'true' })).toBe(false);
+  });
   it('defaults app awareness off and accepts only an explicit boolean opt-in', () => {
     expect(parseSettings({}).appAwareness).toBe(false);
     expect(parseSettings({ appAwareness: true }).appAwareness).toBe(true);
