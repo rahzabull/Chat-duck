@@ -5,7 +5,7 @@ export const ANIMATION_IDS = [
   'gaming', 'laptop', 'coffee', 'shrug', 'laughing', 'confused', 'thinking', 'thought', 'bread',
   'look_around', 'yawn', 'stretch', 'dance', 'side_eye', 'nap', 'strike', 'sunglasses', 'bread_snack', 'visitor',
   'idle', 'blink', 'look_left', 'look_right', 'walking', 'startled', 'picked_up',
-  'falling', 'landing', 'sleeping', 'waking_up', 'angry', 'happy', 'talking', 'sitting',
+  'falling', 'landing', 'landing_big', 'sleeping', 'waking_up', 'angry', 'happy', 'talking', 'sitting',
 ] as const;
 export type AnimationId = typeof ANIMATION_IDS[number];
 export const EMOTION_IDS = ['neutral', 'curious', 'suspicious', 'startled', 'angry', 'happy', 'sleepy'] as const;

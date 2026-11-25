@@ -148,7 +148,7 @@ export class FigmaDuck implements CharacterSurface {
     this.later('blink-end', 120, () => { this.root.classList.remove('blinking'); this.syncTimers(); });
   }
   play(animation: string): void {
-    if (!Object.hasOwn(ACTIVITY_POSES, animation) && animation !== 'landing') return;
+    if (!Object.hasOwn(ACTIVITY_POSES, animation) && animation !== 'landing' && animation !== 'landing_big') return;
     if (animation === 'blink') {
       if (this.active) { this.blink(); this.cancel('blink-completion'); this.later('blink-completion', 120, () => this.listeners.forEach(cb => cb('blink'))); }
       return;
@@ -161,9 +161,10 @@ export class FigmaDuck implements CharacterSurface {
     this.animation = animation; this.phase = 0;
     this.root.dataset.activity = ''; void this.root.getBoundingClientRect();
     let duration = durations[animation];
-    if (animation === 'landing' && this.fallDistance >= 60) {
-      this.landing = 'fallen_a'; duration = 1200;
-      this.later('land-stage', 550, () => { this.landing = 'fallen_b'; this.refresh(); });
+    // Main decides the landing type from the real drop height. Big drop: lie flat at once, then get up. Small drop: land standing.
+    if (animation === 'landing_big') {
+      this.landing = 'fallen_a'; duration = 1600;
+      this.later('land-stage', 700, () => { this.landing = 'fallen_b'; this.refresh(); });
     }
     this.refresh();
     if (duration) this.later('completion', duration, () => {

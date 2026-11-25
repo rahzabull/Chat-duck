@@ -65,7 +65,10 @@ export class CompanionController {
   private awareness: AppAwareness;
   private nextThought = 0;
   private nextLate = 0;
-  private fall?: { height: number; hitWall: boolean };
+  private fall?: { height: number; hitWall: boolean; touched?: boolean };
+  /** Drops at least this tall (DIP) knock Ducky over; shorter drops land on his feet. */
+  static readonly FALL_OVER_HEIGHT = 450;
+  private bigLandingUntil = 0;
   private speech = new SpeechQueue();
   private velocity = new VelocityHistory();
   private cursor: CursorPoller;
@@ -153,7 +156,7 @@ export class CompanionController {
     }, () => app.getAppMetrics().map(metric => metric.pid));
     this.events.on('CHARACTER_CLICKED', ({ count }) => this.react(count >= 5 ? 'angry' : 'startled', count >= 3 ? 'angry' : 'startled'));
     this.events.on('CHARACTER_PICKED_UP', () => this.setAnimation('picked_up'));
-    this.events.on('CHARACTER_LANDED', () => this.react('landing', 'neutral', 430));
+    this.events.on('CHARACTER_LANDED', () => { if (Date.now() >= this.bigLandingUntil) this.react('landing', 'neutral', 430); });
     this.events.on('USER_BECAME_IDLE', () => {
       if (this.conversationQuiet()) return;
       this.cancelActivity(); this.emotions.suspend();
@@ -571,6 +574,14 @@ export class CompanionController {
     const now = performance.now(); const result = step(this.body, (now - this.lastMotion) / 1000, workAreas(), this.size(), this.store.value.reducedMotion || this.reducedMotion);
     this.lastMotion = now; this.body = result.body; this.moveWindow();
     if (this.fall && result.hitWall) this.fall.hitWall = true;
+    // First ground contact decides the landing: a big drop knocks him over at once (no bounce, no standing first); a small drop lands on his feet.
+    if (result.landed && this.fall && !this.fall.touched) {
+      this.fall.touched = true;
+      if (this.fall.height >= CompanionController.FALL_OVER_HEIGHT && !(this.store.value.reducedMotion || this.reducedMotion)) {
+        this.body = { ...this.body, vy: 0, vx: this.body.vx * 0.2, bounces: 99 };
+        this.bigLandingUntil = Date.now() + 1700; this.react('landing_big', 'neutral', 1600);
+      }
+    }
     if (!this.reactionTimer) this.setAnimation(this.baseAnimation());
     if (!moving(this.body)) {
       if (this.fall) {

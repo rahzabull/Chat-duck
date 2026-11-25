@@ -82,9 +82,10 @@ export function runChecks(): { assertions: number; poses: number; paths: number 
     duck.setMotionPosition(20, 2); assert(pose() === 'dragged_right', 'Right drag');
     duck.setMotionPosition(20, 40); assert(pose() === 'dragged_up_down', 'Vertical drag');
     advance(3000); assert(pose() === 'dragged_disgusted', 'Long drag disgust');
-    duck.setDragging(false); duck.play('falling'); duck.setMotionPosition(20, 180); duck.play('landing');
-    assert(pose() === 'fallen_a', 'Big landing starts fallen'); advance(430); duck.play('idle'); assert(pose() === 'fallen_a', 'Survives main physical recovery');
-    advance(120); assert(pose() === 'fallen_b', 'Fallen second pose'); advance(650); assert(pose() === 'idle' && completions.includes('landing'), 'Gets up after 1.2 seconds');
+    duck.setDragging(false); duck.play('falling'); duck.setMotionPosition(20, 900); duck.play('landing_big');
+    assert(pose() === 'fallen_a', 'Big landing starts fallen, never standing first'); advance(430); duck.play('idle'); assert(pose() === 'fallen_a', 'Survives main physical recovery');
+    advance(300); assert(pose() === 'fallen_b', 'Fallen second pose'); advance(900); assert(pose() === 'idle' && completions.includes('landing_big'), 'Gets up after 1.6 seconds');
+    duck.play('falling'); duck.setMotionPosition(20, 1100); duck.play('landing'); assert(pose() === 'idle', 'Ordinary landing never falls over, whatever the adapter measured'); advance(430);
     duck.setDragging(true); duck.setDragging(false); duck.setDragging(true); assert(pose() === 'dragged_disgusted', 'Repeated pickup disgust'); duck.setDragging(false);
     duck.play('falling'); duck.setMotionPosition(20, 185); duck.play('landing'); assert(pose() === 'idle', 'Small drop stays upright'); advance(430);
     for (const id of Object.keys(ACTIVITY_POSES).filter(id => id !== 'blink')) { duck.play(id); assert(!!poseAssets[pose()!], `${id}: available fallback`); }
