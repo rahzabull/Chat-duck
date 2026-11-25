@@ -3,7 +3,7 @@ import { reminderLabel } from '../../core/productivity/presentation';
 import { parseDate, parseProductivity } from '../../core/productivity/parse';
 import { localTime, type Card, type FocusSession, type ProductivityAction, type ProductivityResult, type ProductivityView, type Reminder, type Task } from '../../core/productivity/types';
 import { day, iso, time, validFocus, validNote, validReminder, validTask } from '../../core/productivity/validation';
-import { CHECK_MS, ReminderScheduler } from '../../core/scheduler';
+import { CHECK_MS, nextOccurrence, ReminderScheduler } from '../../core/scheduler';
 import type { ToolCall } from '../../core/conversation/types';
 import { ToolRegistry, type Tool, type ToolResult } from '../tools';
 import { ProductivityStore } from './store';
@@ -46,8 +46,10 @@ export class ProductivityService {
       tool('complete_task', 'complete_task(id?:string, query?:title)', target, a => this.changeTask(a, true)),
       tool('delete_task', 'delete_task(id:string) permanently removes a task; confirm', a => str(a.id, 80), async a => { await store.tasks.save(store.tasks.value.filter(t => t.id !== a.id)); return this.result('Task deleted.'); }, true),
       tool('clear_completed', 'clear_completed() removes completed tasks; confirm', () => true, async () => { await store.tasks.save(store.tasks.value.filter(t => !t.done)); return this.result('Completed tasks cleared.'); }, true),
-      tool('add_reminder', 'add_reminder(text:string, at:ISO datetime, recurrence?:{kind:daily|weekly|monthly|custom,weekdays?:number[],dayOfMonth?:number,intervalDays?:number})', a => validReminder(this.newReminder(a)), async a => {
-        const reminder = this.newReminder(a); if (Date.parse(reminder.at) <= Date.now()) return { ok: false, message: 'Choose a future reminder time.' };
+      tool('add_reminder', 'add_reminder(text:string, at:ISO datetime, recurrence?:{kind:daily|weekly|monthly|custom|interval,weekdays?:number[],dayOfMonth?:number,intervalDays?:number,intervalMinutes?:integer>=5,window?:{start:HH:mm,end:HH:mm}})', a => validReminder(this.newReminder(a)), async a => {
+        const reminder = this.newReminder(a);
+        if (reminder.recurrence?.kind === 'interval') reminder.at = nextOccurrence(reminder, new Date(reminder.createdAt));
+        if (Date.parse(reminder.at) <= Date.now()) return { ok: false, needsInput: true, message: 'Choose a future reminder time.' };
         await store.reminders.save([...store.reminders.value, reminder]); this.created('reminder', reminder.id); return this.result(`Reminder saved: ${reminder.text} — ${reminderLabel(reminder)}`, reminder);
       }),
       tool('list_reminders', 'list_reminders()', () => true, () => { this.open('reminders'); return this.result('Here are your reminders.', store.reminders.value); }),
@@ -62,7 +64,7 @@ export class ProductivityService {
       }),
       tool('search_notes', 'search_notes(query?:string)', a => optional(a.query), a => { const query = String(a.query ?? '').toLowerCase(); const notes = store.notes.value.filter(n => `${n.title ?? ''} ${n.text} ${n.topic ?? ''}`.toLowerCase().includes(query)); this.open('notes', undefined, query); return this.result(notes.length ? 'Here are your notes.' : 'No matching notes.', notes); }),
       tool('update_note', 'update_note(id:string,text?:string,title?:string,topic?:string,pinned?:boolean)', a => str(a.id, 80) && (a.text === undefined || str(a.text, 20000)) && optional(a.title) && optional(a.topic, 100) && (a.pinned === undefined || typeof a.pinned === 'boolean'), async a => {
-        const notes = store.notes.value; const note = notes.find(n => n.id === a.id); if (!note) return { ok: false, message: 'Note not found.' };
+        const notes = store.notes.value; const note = notes.find(n => n.id === a.id); if (!note) return { ok: false, needsInput: true, message: 'Note not found.' };
         Object.assign(note, pick(a, ['text', 'title', 'topic', 'pinned']), { updatedAt: stamp() }); if (!validNote(note)) throw new Error('Invalid note');
         await store.notes.save(notes); return this.result('Note saved.', note);
       }),
@@ -93,15 +95,15 @@ export class ProductivityService {
     const exact = rows.filter(t => t.title.toLowerCase() === query);
     const matches = exact.length ? exact : query ? rows.filter(t => query.split(/\s+/).every(w => t.title.toLowerCase().includes(w))) : [];
     if (matches.length === 1) return { id: matches[0].id };
-    if (!matches.length) return { result: { ok: false, message: 'No matching item. Try its title.' } };
+    if (!matches.length) return { result: { ok: false, needsInput: true, message: 'No matching item. Try its title.' } };
     this.choices = { call, ids: matches.slice(0, 8).map(t => t.id) };
-    return { result: { ok: false, message: `Which one? Reply with a number, or cancel.\n${matches.slice(0, 8).map((t, i) => `${i + 1}. ${t.title}`).join('\n')}` } };
+    return { result: { ok: false, needsInput: true, message: `Which one? Reply with a number, or cancel.\n${matches.slice(0, 8).map((t, i) => `${i + 1}. ${t.title}`).join('\n')}` } };
   }
   private async changeTask(a: Record<string, unknown>, complete: boolean): Promise<ToolResult> {
     const match = this.resolve({ name: complete ? 'complete_task' : 'update_task', args: a }); if (match.result) return match.result;
-    const tasks = this.store.tasks.value; const task = tasks.find(t => t.id === match.id); if (!task) return { ok: false, message: 'Task not found.' };
+    const tasks = this.store.tasks.value; const task = tasks.find(t => t.id === match.id); if (!task) return { ok: false, needsInput: true, message: 'Task not found.' };
     const wasDone = task.done;
-    if (typeof a.dueInput === 'string') { const d = a.dueInput ? parseDate(a.dueInput) : undefined; if (a.dueInput && !d) return { ok: false, message: 'I could not read that date. Try tomorrow 9am.' }; task.due = d?.due; task.dueTime = d?.dueTime; }
+    if (typeof a.dueInput === 'string') { const d = a.dueInput ? parseDate(a.dueInput) : undefined; if (a.dueInput && !d) return { ok: false, needsInput: true, message: 'I could not read that date. Try tomorrow 9am.' }; task.due = d?.due; task.dueTime = d?.dueTime; }
     Object.assign(task, pick(a, ['title', 'due', 'dueTime', 'priority', 'notes', 'category', 'subtasks', 'done']), { updatedAt: stamp() });
     if (!task.due) delete task.due; if (!task.dueTime) delete task.dueTime;
     if (complete) task.done = true; task.doneAt = task.done ? task.doneAt ?? stamp() : undefined;
@@ -111,11 +113,11 @@ export class ProductivityService {
   }
   private async changeReminder(a: Record<string, unknown>, mode: string): Promise<ToolResult> {
     const match = this.resolve({ name: `${mode === 'snooze' ? 'snooze' : 'update'}_reminder`, args: a }); if (match.result) return match.result;
-    const reminders = this.store.reminders.value; const r = reminders.find(r => r.id === match.id); if (!r) return { ok: false, message: 'Reminder not found.' };
+    const reminders = this.store.reminders.value; const r = reminders.find(r => r.id === match.id); if (!r) return { ok: false, needsInput: true, message: 'Reminder not found.' };
     if (mode === 'snooze') { r.snoozedUntil = new Date(Date.now() + Number(a.minutes) * 60000).toISOString(); r.state = 'scheduled'; }
     else if (mode === 'update') {
       const at = typeof a.when === 'string' ? parseDate(a.when)?.at : a.at;
-      if ((a.when !== undefined || a.at !== undefined) && (!iso(at) || Date.parse(at) <= Date.now())) return { ok: false, message: 'Choose a future time, for example tomorrow 9am.' };
+      if ((a.when !== undefined || a.at !== undefined) && (!iso(at) || Date.parse(at) <= Date.now())) return { ok: false, needsInput: true, message: 'Choose a future time, for example tomorrow 9am.' };
       if (at) { r.at = at as string; r.wallTime = localTime(new Date(r.at)); r.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; r.lastFiredAt = undefined; r.snoozedUntil = undefined; r.state = 'scheduled'; }
       if (str(a.text)) r.text = a.text;
     } else { r.state = r.recurrence ? 'scheduled' : mode === 'done' ? 'done' : 'dismissed'; r.snoozedUntil = undefined; }
@@ -134,6 +136,7 @@ export class ProductivityService {
     } else {
       this.choices = undefined;
       const intent = parseProductivity(text); if (!intent) return;
+      if ('error' in intent) return { ok: false, message: intent.error };
       if ('when' in intent) { this.waiting = intent.when; return { ok: false, message: 'When?' }; } call = intent.call;
     }
     if (['delete_task', 'cancel_reminder', 'delete_note'].includes(call.name) && !call.args.id) { const match = this.resolve(call); if (match.result) return match.result; call.args = { id: match.id }; }
@@ -174,7 +177,7 @@ export class ProductivityService {
     this.armFocus(); this.hooks.attention('focus'); return this.result(`${this.focus.kind === 'break' ? 'Break' : 'Focus'} started: ${minutes} minutes.`);
   }
   private focusAction(action: string): ToolResult {
-    if (!this.focus) return { ok: false, message: 'No timer is running.' };
+    if (!this.focus) return { ok: false, needsInput: true, message: 'No timer is running.' };
     if (action === 'pause' && !this.focus.paused) { this.focus.remaining = Math.max(0, this.focus.endAt - Date.now()); this.focus.paused = true; clearTimeout(this.focusTimer); }
     if (action === 'resume' && this.focus.paused) { this.focus.endAt = Date.now() + this.focus.remaining; this.focus.paused = false; this.armFocus(); }
     if (action === 'stop') { clearTimeout(this.focusTimer); this.focus = undefined; return this.result('Timer stopped.'); }

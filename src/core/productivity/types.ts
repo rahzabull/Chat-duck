@@ -4,7 +4,13 @@ export interface Task {
   subtasks: { id: string; title: string; done: boolean }[];
   done: boolean; doneAt?: string; createdAt: string; updatedAt: string;
 }
-export interface Recurrence { kind: 'daily' | 'weekly' | 'monthly' | 'custom'; weekdays?: number[]; dayOfMonth?: number; intervalDays?: number }
+export interface Recurrence {
+  kind: 'daily' | 'weekly' | 'monthly' | 'custom' | 'interval';
+  weekdays?: number[]; dayOfMonth?: number; intervalDays?: number;
+  intervalMinutes?: number;
+  /** Local, same-day window; end is exclusive. */
+  window?: { start: string; end: string };
+}
 export interface Reminder {
   id: string; text: string; at: string; recurrence?: Recurrence; snoozedUntil?: string;
   lastFiredAt?: string; state: 'scheduled' | 'due' | 'done' | 'dismissed'; createdAt: string; timezone: string;

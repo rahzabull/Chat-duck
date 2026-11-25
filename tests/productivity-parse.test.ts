@@ -1,8 +1,69 @@
 import { describe, expect, it } from 'vitest';
-import { parseDate, parseProductivity, reminderDate } from '../src/core/productivity/parse';
+import { cleanProductivityTitle, parseDate, parseProductivity, reminderDate } from '../src/core/productivity/parse';
 const now = new Date(2026, 10, 25, 10, 0); // Wednesday, local time.
 const parse = (text: string) => parseProductivity(text, now);
 describe('offline productivity language', () => {
+  it.each([
+    ['can you remind me to drink water in every half an hour', 'drink water'],
+    ['remind me every half an hour to drink water', 'drink water'],
+    ['please remind me to stretch every hour between 10 and 7?', 'stretch'],
+    ['could you remind me to call mum tomorrow at 6', 'call mum'],
+    ['would you please remind me that the oven needs checking in 20 minutes.', 'the oven needs checking'],
+    ['will you remind me to take vitamins every day?', 'take vitamins'],
+    ['hey ducky, pls remind me to pay rent on the first of every month.', 'pay rent'],
+    ['ducky, please remind me to drink water in every 30 minutes?', 'drink water'],
+    ["don't let me forget to call mum tomorrow at 6", 'call mum'],
+    ['please remind me that I need to stretch every hour', 'stretch'],
+    ['remind me in every half an hour to drink water', 'drink water'],
+    ['remind me in every day to take vitamins', 'take vitamins'],
+    ['remind me in every Tuesday to take vitamins', 'take vitamins'],
+    ['please remind me to drink water in an hour', 'drink water'],
+    ['please remind me in an hour to drink water', 'drink water'],
+    ['please remind me to add milk every hour', 'add milk'],
+    ['can you remind me to check in every hour', 'check'],
+  ])('cleans reminder title: %s', (input, text) => {
+    expect(parse(input)).toMatchObject({ call: { name: 'add_reminder', args: { text } } });
+    expect(reminderDate(input, now).text).toBe(text);
+  });
+  it.each([
+    'can you add buy milk to my list', 'could you please add task buy milk tomorrow to my list?',
+    'would you add buy milk to the list tomorrow.', 'will you pls add buy milk',
+    'hey ducky, please add buy milk to my list', 'ducky, I need to buy milk tomorrow at 6.',
+  ])('cleans task title: %s', input => {
+    expect(parse(input)).toMatchObject({ call: { name: 'add_task', args: { title: 'buy milk' } } });
+  });
+  it.each(['in', 'at', 'on', 'every', 'for', 'by', 'in every', 'in every at'])('removes dangling schedule connectors: %s', suffix => {
+    expect(cleanProductivityTitle(`can you please remind me to drink water ${suffix}?.`)).toBe('drink water');
+    expect(cleanProductivityTitle(`could you I need to buy milk ${suffix}.`)).toBe('buy milk');
+  });
+  it('preserves internal words and cleans undated reminder prompts', () => {
+    expect(parse('could you remind me to call mum?')).toEqual({ when: { text: 'call mum' } });
+    expect(cleanProductivityTitle('check in with mum')).toBe('check in with mum');
+    expect(cleanProductivityTitle('buy milk for tea')).toBe('buy milk for tea');
+  });
+  it('preserves the requested interval window while cleaning punctuation', () => {
+    expect(parse('please remind me to stretch every hour between 10 and 7?')).toMatchObject({ call: { args: {
+      text: 'stretch', recurrence: { kind: 'interval', intervalMinutes: 60, window: { start: '10:00', end: '19:00' } },
+    } } });
+  });
+  it.each([
+    ['every half an hour', 30], ['every 30 minutes', 30], ['every 2 hours', 120],
+    ['every hour', 60], ['hourly', 60], ['every 45 mins', 45], ['every 5 minutes', 5], ['every an hour', 60], ['every 48 hours', 2880],
+  ])('parses interval %s and starts one interval after creation', (phrase, minutes) => {
+    const result = parse(`remind me to drink water ${phrase}`);
+    expect(result).toEqual({ call: { name: 'add_reminder', args: { text: 'drink water', recurrence: { kind: 'interval', intervalMinutes: minutes }, at: new Date(+now + minutes * 60000).toISOString() } } });
+  });
+  it.each(['between 9 and 6', 'during work hours (9-6)', 'until 6pm', 'between 9am and 6pm'])('parses local window %s without leaking it into the title', window => {
+    const result = reminderDate(`drink water every 30 minutes ${window}`, now);
+    expect(result).toMatchObject({ text: 'drink water', recurrence: { kind: 'interval', intervalMinutes: 30, window: { start: '09:00', end: '18:00' } } });
+  });
+  it.each(['every 4 minutes', 'every 0 hours', 'every 1.1 minutes'])('rejects invalid interval %s instead of creating a one-off', phrase => {
+    expect(parse(`remind me to drink water ${phrase}`)).toEqual({ error: 'Choose an interval of at least 5 whole minutes.' });
+  });
+  it('rejects inverted explicit windows and resolves stop as a series cancellation', () => {
+    expect(parse('remind me to drink water hourly between 6pm and 9am')).toHaveProperty('error');
+    expect(parse('stop the water reminder')).toEqual({ call: { name: 'cancel_reminder', args: { query: 'water' } } });
+  });
   it.each([
     ['add buy dog food', 'add_task'], ['add finish the presentation to my list.', 'add_task'], ['I need to call insurance tomorrow', 'add_task'],
     ['show me what I have to do today', 'list_tasks'], ['what do I have today?', 'list_tasks'], ["what's due this week?", 'list_tasks'], ['overdue?', 'list_tasks'],

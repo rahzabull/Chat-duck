@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS: Settings = {
   skillPack: 'companion', privacyMode: false, dndUntil: 0, gamingBehaviour: 'hide', dndReminders: 'notification',
   quietHoursEnabled: false, quietHoursStart: '23:00', quietHoursEnd: '08:00',
   morningBriefing: true, briefingStart: '05:00', briefingEnd: '12:00', eveningSummary: false, deadlineNudges: true, assistanceOffers: true,
-  proactiveHistory: {},
+  proactiveHistory: {}, talkHintCount: 0,
   conversationShortcut: 'Ctrl+Alt+D', conversationRetention: '7 days',
   personality: 'sarcastic', profanity: false, activityLevel: 'normal', memoryEnabled: true, preferredName: '', installSeed: 0, dailyMood: null,
   alwaysOnTop: true, desktopOnly: false, characterSize: 1, launchAtStartup: false,
@@ -35,6 +35,7 @@ const validDnd = (v: unknown): v is number => finite(v) && Number.isSafeInteger(
 export function parseSettings(value: unknown): Settings {
   const result: Settings = { ...DEFAULT_SETTINGS };
   if (!isRecord(value)) return result;
+  if (finite(value.talkHintCount) && Number.isInteger(value.talkHintCount)) result.talkHintCount = Math.min(3, Math.max(0, value.talkHintCount));
   if (SKILL_PACK_IDS.includes(value.skillPack as never)) result.skillPack = value.skillPack as Settings['skillPack'];
   if (validDnd(value.dndUntil)) result.dndUntil = value.dndUntil;
   if (['hide', 'freeze'].includes(value.gamingBehaviour as string)) result.gamingBehaviour = value.gamingBehaviour as Settings['gamingBehaviour'];

@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { parseForegroundLine, type ForegroundSample } from '../../core/awareness';
 import { awarenessScript } from './awareness-script';
+import { ForegroundFocus } from './foreground';
 
 // Keep opaque handles as decimal strings: never send them into app context or logs.
 const validHwnd = (value: string): boolean => value.length > 0 && value.length <= 19 && !/[^0-9]/.test(value) && BigInt(value) <= 9223372036854775807n;
@@ -12,30 +13,16 @@ export class AppAwareness {
   private stopping = false;
   private retries = 0;
   private retryTimer?: ReturnType<typeof setTimeout>;
-  private lastHwnd?: string;
-  private foregroundReply?: (hwnd?: string) => void;
-  captureForeground(ready: (hwnd?: string) => void): void {
-    if (!this.child || this.stopping || !this.wanted || this.child.stdin.destroyed) { ready(this.lastHwnd); return; }
-    // One outstanding request; the resident reader answers independently of sampling.
-    this.foregroundReply?.(this.lastHwnd);
-    const timeout = setTimeout(() => finish(this.lastHwnd), 150);
-    const finish = (hwnd?: string) => { clearTimeout(timeout); this.foregroundReply = undefined; ready(hwnd); };
-    this.foregroundReply = finish;
-    this.child.stdin.write('fg\n');
-  }
-  restoreForeground(hwnd: string): boolean {
-    if (!validHwnd(hwnd) || BigInt(hwnd) === 0n || !this.child || this.stopping || !this.wanted || this.child.stdin.destroyed) return false;
-    this.child.stdin.write(`restore ${hwnd}\n`); return true;
-  }
+  captureForeground(): string | undefined { return this.focus.capture(); }
+  restoreForeground(hwnd: string): boolean { return this.focus.restore(hwnd); }
   constructor(private sample: (sample: ForegroundSample) => void, private status: (active: boolean) => void,
-    private ownPids: () => number[], private launch = spawn) {}
+    private ownPids: () => number[], private launch = spawn, private focus = new ForegroundFocus()) {}
   configure(enabled: boolean, identity = true): void {
     if (identity !== this.identity) { this.configure(false, this.identity); this.identity = identity; }
     if (enabled === this.wanted) return;
     this.wanted = enabled;
     if (!enabled) {
       if (this.retryTimer) clearTimeout(this.retryTimer); this.retryTimer = undefined;
-      this.foregroundReply?.(this.lastHwnd);
       this.status(false);
       if (this.child) { this.stopping = true; this.child.stdin.destroy(); this.child.kill(); }
     } else { this.retries = 0; if (!this.child) this.start(); }
@@ -61,13 +48,9 @@ export class AppAwareness {
       while ((end = buffer.indexOf('\n')) >= 0) {
         const line = buffer.slice(0, end).replace(/\r$/, ''); buffer = buffer.slice(end + 1);
         const parts = line.split('|');
-        if (parts.length === 2 && parts[0] === 'hwnd' && validHwnd(parts[1])) {
-          this.foregroundReply?.(BigInt(parts[1]) === 0n ? undefined : parts[1]); continue;
-        }
         if (parts.length === 3 && !validHwnd(parts[2])) continue;
         const sample = parseForegroundLine(parts.length === 3 ? parts.slice(0, 2).join('|') : line);
         if (!sample) continue;
-        if (parts.length === 3) this.lastHwnd = BigInt(parts[2]) === 0n ? undefined : parts[2];
         this.status(true); this.sample(this.identity ? sample : { app: null, fullscreen: sample.fullscreen });
         if (!child.stdin.destroyed) child.stdin.write([process.pid, ...this.ownPids()].join(',') + '\n');
       }
@@ -76,7 +59,6 @@ export class AppAwareness {
     child.once('close', () => {
       if (this.child !== child) return;
       this.child = undefined; this.status(false);
-      this.foregroundReply?.(this.lastHwnd);
       if (this.stopping) { this.stopping = false; if (this.wanted) this.start(); }
       else if (this.wanted) this.failed();
     });
@@ -88,5 +70,5 @@ export class AppAwareness {
     const delay = 1000 * 2 ** this.retries++;
     this.retryTimer = setTimeout(() => { this.retryTimer = undefined; this.start(); }, delay);
   }
-  dispose(): void { this.configure(false); this.lastHwnd = undefined; }
+  dispose(): void { this.configure(false); }
 }

@@ -14,6 +14,29 @@ afterEach(() => { service.dispose(); rmSync(directory, { recursive: true, force:
 async function action(name: string, args: Record<string, unknown> = {}, token?: string) { const p = service.action({ name, args, token }); await vi.advanceTimersByTimeAsync(300); return p; }
 async function local(text: string) { const p = service.local(text); await vi.advanceTimersByTimeAsync(300); return p; }
 describe('AI-independent productivity orchestration', () => {
+  it('persists clean titles from the desktop feedback across a restart', async () => {
+    expect((await local('can you remind me to drink water in every half an hour'))?.ok).toBe(true);
+    expect((await local('can you add buy milk to my list'))?.ok).toBe(true);
+    service.dispose(); store = new ProductivityStore(directory); service = new ProductivityService(store, hooks);
+    expect(store.reminders.value[0]).toMatchObject({ text: 'drink water', recurrence: { kind: 'interval', intervalMinutes: 30 } });
+    expect(store.tasks.value[0].title).toBe('buy milk');
+  });
+  it('keeps the series through Snooze and Done, and confirms a spoken stop before deleting it', async () => {
+    await local('remind me to drink water every half an hour');
+    const original = store.reminders.value[0]; expect(Date.parse(original.at) - Date.parse(original.createdAt)).toBe(1800000);
+    vi.setSystemTime(new Date(original.at)); await service.tick();
+    const next = store.reminders.value[0].at; await action('snooze_reminder', { id: original.id, minutes: 10 });
+    expect(store.reminders.value[0].at).toBe(next);
+    vi.setSystemTime(new Date(store.reminders.value[0].snoozedUntil!)); await service.tick();
+    await action('done_reminder', { id: original.id }); expect(store.reminders.value[0]).toMatchObject({ at: next, state: 'scheduled', recurrence: { kind: 'interval', intervalMinutes: 30 } });
+    service.dispose(); store = new ProductivityStore(directory); service = new ProductivityService(store, hooks);
+    expect(store.reminders.value[0].createdAt).toBe(original.createdAt);
+    const stop = await local('stop the water reminder'); expect(stop?.confirmation).toMatchObject({ name: 'cancel_reminder', args: { id: original.id } }); expect(store.reminders.value).toHaveLength(1);
+    const result = service.registry.run(stop!.confirmation!, 0, true); await vi.advanceTimersByTimeAsync(300); expect((await result).ok).toBe(true); expect(store.reminders.value).toEqual([]);
+  });
+  it('reports too-short intervals locally without creating a reminder', async () => {
+    expect((await local('remind me to drink water every 2 minutes'))?.message).toContain('5 whole minutes'); expect(store.reminders.value).toEqual([]);
+  });
   it('uses the shared plain-words reminder label in confirmations', async () => {
     const result = await action('add_reminder', { text: 'water', at: new Date(2026, 10, 25, 16, 17, 59).toISOString() });
     expect(result.message).toBe('Reminder saved: water — Today, 4:17 PM');

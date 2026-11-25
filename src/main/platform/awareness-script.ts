@@ -22,17 +22,6 @@ public static class DuckyForeground {
       try {
         string line;
         while ((line = Console.ReadLine()) != null) {
-          if (line == "fg") {
-            Console.Out.WriteLine("hwnd|" + GetForegroundWindow().ToInt64()); Console.Out.Flush(); continue;
-          }
-          if (System.Text.RegularExpressions.Regex.IsMatch(line, @"\\Arestore [0-9]+\\z")) {
-            long value;
-            if (Int64.TryParse(line.Substring(8), out value) && value > 0 && (IntPtr.Size == 8 || value <= Int32.MaxValue)) {
-              IntPtr hwnd = new IntPtr(value);
-              if (IsWindow(hwnd)) SetForegroundWindow(hwnd);
-            }
-            continue;
-          }
           if (!System.Text.RegularExpressions.Regex.IsMatch(line, @"\\A[0-9]+(,[0-9]+)*\\z")) continue;
           string[] parts = line.Split(','); uint[] ids = new uint[parts.Length]; bool valid = true;
           for (int i = 0; i < parts.Length; i++) if (!UInt32.TryParse(parts[i], out ids[i])) { valid = false; break; }
@@ -45,8 +34,6 @@ public static class DuckyForeground {
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
   [StructLayout(LayoutKind.Sequential)] public struct MONITORINFO { public int Size; public RECT Monitor, Work; public uint Flags; }
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
-  [DllImport("user32.dll")] static extern bool IsWindow(IntPtr hwnd);
-  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
   [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
   [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool QueryFullProcessImageName(IntPtr process, uint flags, StringBuilder name, ref uint size);

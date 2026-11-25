@@ -393,10 +393,24 @@ export const LINES: Record<Situation, Line[]> = {
 
 /** Conversation lines do not enter the ambient situation/cooldown director. */
 export const TALK_LINES = {
+  talk_hint: [
+    "You can tell me to remind you of stuff. I'll nag. Lovingly.",
+    "Tell me your to-dos. This hat holds a surprising amount.",
+    "Try ‘remind me to drink water every half an hour’. Hydrated humans, please.",
+    "Say ‘show my notes’ or ‘what do I have today?’ I've got you.",
+    "Need a focus timer? Just ask. I'll watch the clock.",
+  ],
   talk_huh: ["Say that again?", "That was mostly keyboard.", "A few more words? Small duck, limited clues.", "Didn't quite catch that. Try me again?"],
   talk_greeting: ["I'm listening. Hat and all.", "Alright. What's on your mind?", "You rang? I've cleared my very busy schedule."],
   talk_signoff: ["Alright. Back to duck business.", "I'll be here. Doing absolutely vital nothing.", "Catch you in a bit."],
   talk_still_thinking: ["Still thinking. Small hat, big question.", "Give me a moment. The gears are turning."],
   talk_error: ["That thought got tangled. Try me again?", "Couldn't get a proper answer just then. I won't make one up."],
+  talk_tool_failed: [
+    "I tried. My tiny wings slipped. Say it a different way?",
+    "That didn't go to plan. Small duck, tangled instructions. Try me again?",
+    "I couldn't get that done. My hat has no answers. Could you rephrase it?",
+    "Something tripped me up. I can't confirm that worked. Let's try again?",
+    "That request got stuck under my hat. I couldn't finish it. Say it another way?",
+  ],
   talk_offline: ["My brain's offline right now. I can still remember things for you.", "Ollama isn't answering. My notebook still works, though.", "The thinking department is closed. Remembering and forgetting are still open.", "Can't answer that properly while my brain's offline. Ask me to remember something?", "No local brain connection. I'm still here, just less encyclopedic.", "I'd rather admit I'm offline than invent an answer. I can still show your memories."],
 } as const;

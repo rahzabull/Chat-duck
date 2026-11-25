@@ -1,4 +1,5 @@
 import type { CompanionState } from '../../shared/types';
+import { closeButton } from '../shared/close';
 
 export class ProactiveUI {
   private badge = document.createElement('span');
@@ -12,11 +13,13 @@ export class ProactiveUI {
     this.accept.type = this.later.type = 'button';
     this.accept.onclick = () => { void window.ducky.command('proactive-accept'); };
     this.later.onclick = () => { void window.ducky.command('proactive-later'); };
-    this.card.append(this.detail, this.accept, this.later); this.card.hidden = true; this.badge.hidden = true;
+    const header = document.createElement('header'); const title = document.createElement('strong'); title.textContent = 'Ducky';
+    header.append(title, closeButton(() => { void window.ducky.command('proactive-later'); }));
+    this.card.append(header, this.detail, this.accept, this.later); this.card.hidden = true; this.badge.hidden = true;
     document.body.append(this.badge, this.card);
   }
   render(state: CompanionState): void {
-    this.badge.textContent = [state.dnd ? '☾' : '', state.settings.privacyMode ? '🕶' : ''].filter(Boolean).join(' ');
+    this.badge.textContent = [state.dnd ? '☾ Do not disturb' : '', state.settings.privacyMode ? '◐ Privacy mode' : ''].filter(Boolean).join(' · ');
     this.badge.setAttribute('aria-label', [state.dnd ? 'Do not disturb' : '', state.settings.privacyMode ? 'Privacy mode' : ''].filter(Boolean).join(', '));
     this.badge.hidden = !this.badge.textContent || !state.visible || !!state.gaming;
     const view = state.proactive;

@@ -26,7 +26,8 @@ function setup(aiEnabled = false, productivity?: ProductivityService) {
   const companion = { state: { settings: { ...DEFAULT_SETTINGS, aiEnabled, aiModel: 'qwen3:8b' } } as CompanionState, window,
     aiBlocked: vi.fn(() => companion.state.settings.dndUntil === -1 || companion.state.settings.dndUntil > Date.now() || !!companion.state.gaming),
     updateSettings: vi.fn((patch: Partial<CompanionState['settings']>) => { Object.assign(companion.state.settings, patch); }),
-    captureConversationFocus: vi.fn((ready: () => void) => ready()),
+    consumeTalkHint: vi.fn(() => { const s = companion.state.settings; if (s.talkHintCount >= 3) return false; s.talkHintCount++; return true; }),
+    captureConversationFocus: call('capture'),
     releaseConversationFocus: vi.fn(() => { window.setFocusable(false); window.hide(); window.showInactive(); window.setAlwaysOnTop(companion.state.settings.alwaysOnTop && !companion.state.settings.desktopOnly, 'screen-saver'); }),
     setConversationInference: vi.fn(), beginConversation: vi.fn(), finishConversation: vi.fn(), muteFor: vi.fn(),
     presentConversation: vi.fn((view: NonNullable<CompanionState['conversation']>) => { companion.state.conversation = view; calls.push(view.inputReady ? 'renderer:focus' : 'renderer:waiting'); }),
@@ -40,16 +41,45 @@ beforeEach(() => {
 });
 afterEach(() => { service?.dispose(); rmSync(directory, { recursive: true, force: true }); vi.useRealTimers(); });
 describe('conversation main controller', () => {
-  it('captures before activating, does not recapture on refocus, and cancels a pending open', () => {
-    const companion = setup(); let ready!: () => void;
-    companion.captureConversationFocus.mockImplementation(callback => { ready = callback; });
-    service.open(); service.open();
-    expect(companion.captureConversationFocus).toHaveBeenCalledOnce(); expect(companion.window.focus).not.toHaveBeenCalled();
-    ready(); expect(companion.window.focus).toHaveBeenCalledOnce();
+  it.each([false, true])('handles a local validation failure with AI enabled=%s', async aiEnabled => {
+    const data = new ProductivityStore(directory);
+    const productivity = new ProductivityService(data, { changed: vi.fn(), attention: vi.fn(), notify: vi.fn(), export: vi.fn(), doNotDisturb: () => false });
+    const companion = setup(aiEnabled, productivity); service.open();
+    const local = vi.spyOn(productivity, 'local').mockImplementationOnce(() => productivity.registry.run({ name: 'add_task', args: { title: 123 } }, 0));
+    driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'Let me fix that.', tone: 'warm', tool: { name: 'add_task', args: { title: 'buy milk' } } }))
+      .mockResolvedValueOnce(JSON.stringify({ reply: 'I added that task.', tone: 'warm', tool: null }));
+    const pending = service.send('can you add buy milk to my list'); await vi.advanceTimersByTimeAsync(300); await pending;
+    if (aiEnabled) {
+      expect(data.tasks.value.map(task => task.title)).toEqual(['buy milk']); expect(companion.state.conversation?.reply).toBe('Added: buy milk');
+      expect(driver.generate.mock.calls[0][0].messages.at(-1).content).toContain('Invalid tool arguments');
+    } else {
+      expect(TALK_LINES.talk_tool_failed).toContain(companion.state.conversation?.reply); expect(driver.generate).not.toHaveBeenCalled(); expect(data.tasks.value).toEqual([]);
+    }
+    local.mockRestore(); productivity.dispose();
+  });
+  it('displays a worded duck fact after rejecting an emoji-only answer', async () => {
+    const companion = setup(true);
+    driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: '🦆', tone: 'amused', tool: null }))
+      .mockResolvedValueOnce(JSON.stringify({ reply: '🦆 Ducks have waterproof feathers. :)', tone: 'amused', tool: null }));
+    service.open(); await service.send('tell me a fun fact about ducks');
+    expect(companion.state.conversation?.reply).toBe('Ducks have waterproof feathers. :)'); expect(driver.generate).toHaveBeenCalledTimes(2);
+  });
+  it('includes a hand-written hint on only the first three conversation openings', () => {
+    const companion = setup();
+    for (let i = 0; i < 5; i++) {
+      service.open(); const reply = companion.state.conversation!.reply;
+      expect(TALK_LINES.talk_hint.some(hint => reply.includes(hint))).toBe(i < 3);
+      service.open(); expect(companion.state.settings.talkHintCount).toBe(Math.min(i + 1, 3));
+      service.end(false);
+    }
+  });
+  it('captures synchronously before any activation and keeps that capture through refocus', () => {
+    const companion = setup(); companion.window.calls.length = 0;
+    service.open();
+    expect(companion.window.calls.slice(0, 5)).toEqual(['capture', 'focusable:true', 'show', 'focus', 'contents.focus']);
     service.open(); expect(companion.captureConversationFocus).toHaveBeenCalledOnce();
-    service.end(); service.open(); service.end();
-    const activations = companion.window.focus.mock.calls.length;
-    ready(); expect(companion.window.focus).toHaveBeenCalledTimes(activations);
+    service.end(false); service.open(); expect(companion.captureConversationFocus).toHaveBeenCalledTimes(2);
+    service.dispose(); service.open(); expect(companion.captureConversationFocus).toHaveBeenCalledTimes(2);
   });
   it('routes productivity ahead of AI and leaves user data intact when memory is forgotten', async () => {
     const data = new ProductivityStore(directory); const productivity = new ProductivityService(data, { changed: vi.fn(), attention: vi.fn(), notify: vi.fn(), export: vi.fn(), doNotDisturb: () => false });
@@ -82,7 +112,7 @@ describe('conversation main controller', () => {
       handler({ sender: companion.window.webContents, senderFrame: frame }, undefined);
       cleanup();
     } else if (path === 'bye') await service.send('bye');
-    else if (path === 'blur-timeout') { companion.window.emit('blur'); await vi.advanceTimersByTimeAsync(20000); }
+    else if (path === 'blur-timeout') { companion.window.emit('blur'); await vi.advanceTimersByTimeAsync(5000); }
     else await vi.advanceTimersByTimeAsync(90000);
     expect(end).toHaveBeenCalledOnce(); expect(companion.releaseConversationFocus).toHaveBeenCalledOnce();
     const calls = companion.window.calls.filter(c => !c.startsWith('renderer:'));
@@ -104,7 +134,7 @@ describe('conversation main controller', () => {
     const revision = companion.state.conversation!.revision;
     await vi.advanceTimersByTimeAsync(16000);
     expect(driver.generate).not.toHaveBeenCalled(); expect(companion.state.conversation!.revision).toBe(revision);
-    driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'Hello.', tone: 'warm', tool: null }));
+    driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'Hello there, friend.', tone: 'warm', tool: null }));
     await service.send('Hello');
     const turns = driver.generate.mock.calls[0][0].messages.slice(1);
     expect(turns).toEqual([{ role: 'user', content: 'Hello' }]);
@@ -150,7 +180,7 @@ describe('conversation main controller', () => {
     const companion = setup(); expect(driver.register).toHaveBeenCalledWith('Ctrl+Alt+D', expect.any(Function));
     companion.window.calls.length = 0;
     driver.register.mock.calls[0][1](); // Assert before yielding even one microtask.
-    expect(companion.window.calls.slice(0, 4)).toEqual(['focusable:true', 'show', 'focus', 'contents.focus']);
+    expect(companion.window.calls.slice(0, 5)).toEqual(['capture', 'focusable:true', 'show', 'focus', 'contents.focus']);
     expect(companion.window.calls.indexOf('renderer:focus')).toBeGreaterThan(3);
     expect(companion.state.conversation?.inputReady).toBe(true);
     companion.window.calls.length = 0;
@@ -195,17 +225,22 @@ describe('conversation main controller', () => {
     expect(TALK_LINES.talk_huh).toContain(companion.state.conversation?.reply); expect(driver.generate).not.toHaveBeenCalled();
   });
   it.each(['hi', '你好', 'éé'])('still sends a meaningful short message %s to the model', async text => {
-    const companion = setup(true); driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'Hello there.', tone: 'warm', tool: null }));
-    service.open(); await service.send(text); expect(driver.generate).toHaveBeenCalledOnce(); expect(companion.state.conversation?.reply).toBe('Hello there.');
+    const companion = setup(true); driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'Hello there, friend.', tone: 'warm', tool: null }));
+    service.open(); await service.send(text); expect(driver.generate).toHaveBeenCalledOnce(); expect(companion.state.conversation?.reply).toBe('Hello there, friend.');
   });
   it('reports shortcut registration conflicts', () => {
     driver.register.mockReturnValue(false); const companion = setup(); expect(companion.state.conversation?.shortcutError).toContain('unavailable');
   });
-  it('closes after 20 seconds of continuous blur and cancels blur timeout on refocus', async () => {
+  it('closes after 5 seconds of continuous blur and cancels blur timeout on refocus', async () => {
     const companion = setup(); await service.open(); companion.window.emit('blur');
-    await vi.advanceTimersByTimeAsync(19000); expect(companion.state.conversation?.active).toBe(true);
+    await vi.advanceTimersByTimeAsync(4999); expect(companion.state.conversation?.active).toBe(true);
     companion.window.emit('focus'); await vi.advanceTimersByTimeAsync(5000); expect(companion.state.conversation?.active).toBe(true);
-    companion.window.emit('blur'); await vi.advanceTimersByTimeAsync(20001); expect(companion.state.conversation?.active).toBe(false);
+    companion.window.emit('blur'); await vi.advanceTimersByTimeAsync(5001); expect(companion.state.conversation?.active).toBe(false);
+  });
+  it('does not retry native focus after a desktop click during the initial activation window', async () => {
+    const companion = setup(); service.open(); driver.focused = false; companion.window.emit('blur');
+    await vi.advanceTimersByTimeAsync(4999); expect(companion.window.focus).toHaveBeenCalledOnce(); expect(companion.state.conversation?.active).toBe(true);
+    await vi.advanceTimersByTimeAsync(1); expect(companion.state.conversation?.active).toBe(false);
   });
   it('resets 90-second inactivity on typing and closes afterwards', async () => {
     const companion = setup(); await service.open(); await vi.advanceTimersByTimeAsync(80000); service.typing();
@@ -251,20 +286,20 @@ describe('conversation main controller', () => {
   });
   it('requires a user yes for model-requested memories and reports the result locally', async () => {
     const companion = setup(true);
-    driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'Saved already', tone: 'warm', tool: { name: 'remember', args: { text: 'tea', category: 'preference' } } })).mockResolvedValueOnce(JSON.stringify({ reply: 'Saved tea.', tone: 'warm', tool: null }));
+    driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'I saved that already', tone: 'warm', tool: { name: 'remember', args: { text: 'tea', category: 'preference' } } })).mockResolvedValueOnce(JSON.stringify({ reply: 'Saved tea.', tone: 'warm', tool: null }));
     await service.open(); await service.send('Can you keep this preference?'); expect(store.memories).toEqual([]); expect(companion.state.conversation?.reply).toContain('yes or no');
     await service.send('yes'); expect(store.memories[0].text).toBe('tea'); expect(companion.state.conversation?.reply).toBe('Saved: tea');
     expect(driver.generate).toHaveBeenCalledOnce();
   });
   it('ignores late summaries after forgetting everything', async () => {
-    setup(true); driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'Hello.', tone: 'warm', tool: null }));
+    setup(true); driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'Hello there, friend.', tone: 'warm', tool: null }));
     await service.open(); await service.send('Hello'); let resolve!: (s: string) => void;
     driver.generate.mockImplementationOnce(() => new Promise<string>(r => { resolve = r; })); service.end();
     service.forgetEverything(); resolve(JSON.stringify({ summary: 'Old private text', topics: ['old', 'private', 'text'] }));
     await vi.advanceTimersByTimeAsync(1000); expect(store.conversations).toEqual([]); expect(store.memories).toEqual([]);
   });
   it('keeps ambient inference suspended until the summary completes', async () => {
-    const companion = setup(true); driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'Hello.', tone: 'warm', tool: null }));
+    const companion = setup(true); driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: 'Hello there, friend.', tone: 'warm', tool: null }));
     await service.open(); await service.send('Hello'); let resolve!: (s: string) => void;
     driver.generate.mockImplementationOnce(() => new Promise<string>(r => { resolve = r; })); service.end();
     expect(companion.setConversationInference).toHaveBeenLastCalledWith(true);

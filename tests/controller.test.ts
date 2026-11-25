@@ -16,7 +16,7 @@ const driver = vi.hoisted(() => ({
   point: { x: 1736, y: 1030 }, idle: 0,
   drag: (_point: Point) => {}, sample: (_sample: ForegroundSample) => {}, status: (_active: boolean) => {},
   configure: vi.fn(), dispose: vi.fn(),
-  captureForeground: vi.fn((ready: (hwnd?: string) => void) => ready('12345')), restoreForeground: vi.fn(() => true),
+  captureForeground: vi.fn((): string | undefined => '12345'), restoreForeground: vi.fn(() => true),
 }));
 vi.mock('electron', () => ({
   app: { isPackaged: false, getVersion: () => 'test', getAppMetrics: () => [], setLoginItemSettings: vi.fn() },
@@ -63,14 +63,37 @@ beforeEach(() => {
 afterEach(() => { controller?.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('controller personality wiring', () => {
+  it('consumes at most three hints and retains the count on restart with memory disabled', () => {
+    create({ memoryEnabled: false });
+    expect([controller.consumeTalkHint(), controller.consumeTalkHint(), controller.consumeTalkHint(), controller.consumeTalkHint()]).toEqual([true, true, true, false]);
+    const persisted = { ...controller.state.settings }; controller.dispose(); create(persisted);
+    expect(controller.consumeTalkHint()).toBe(false); expect(controller.state.settings.talkHintCount).toBe(3);
+  });
   it('restores the captured window before dropping focusability without hiding', () => {
-    create(); controller.captureConversationFocus(vi.fn());
+    create(); controller.captureConversationFocus();
     controller.state.productivity = { focus: { kind: 'focus' } } as ProductivityView; // A running focus timer must not retain keyboard focus.
     window.setFocusable.mockClear(); window.hide.mockClear(); window.showInactive.mockClear();
     controller.releaseConversationFocus();
     expect(driver.restoreForeground).toHaveBeenCalledWith('12345');
     expect(driver.restoreForeground.mock.invocationCallOrder[0]).toBeLessThan(window.setFocusable.mock.invocationCallOrder[0]);
     expect(window.setFocusable).toHaveBeenCalledWith(false); expect(window.hide).not.toHaveBeenCalled(); expect(window.showInactive).not.toHaveBeenCalled();
+  });
+  it('retains the exact open-time handle despite a later awareness sample', () => {
+    create(); driver.captureForeground.mockReturnValueOnce('222'); controller.captureConversationFocus();
+    driver.sample({ app: { name: 'ChatGPT', category: 'other' }, fullscreen: false });
+    controller.releaseConversationFocus(); expect(driver.restoreForeground).toHaveBeenLastCalledWith('222');
+    controller.releaseConversationFocus(); expect(driver.restoreForeground).toHaveBeenCalledOnce();
+  });
+  it('logs only dev focus paths and yields when the captured HWND cannot be restored', () => {
+    const log = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    create(); controller.captureConversationFocus(); driver.restoreForeground.mockReturnValueOnce(false);
+    window.hide.mockClear(); controller.releaseConversationFocus();
+    expect(window.hide).toHaveBeenCalledOnce(); expect(log.mock.calls).toEqual([
+      ['[ducky:focus]', 'capture: synchronous fg'], ['[ducky:focus]', 'restore: captured HWND failed; yield'],
+    ]);
+    log.mockClear(); Object.defineProperty(app, 'isPackaged', { value: true, configurable: true });
+    try { controller.captureConversationFocus(); controller.releaseConversationFocus(); expect(log).not.toHaveBeenCalled(); }
+    finally { Object.defineProperty(app, 'isPackaged', { value: false, configurable: true }); }
   });
   it('anchors productivity cards and keeps focus quiet while reminders can turn and alarm', () => {
     create({ mute: true, talkativeness: 'quiet' });

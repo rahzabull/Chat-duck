@@ -35,6 +35,34 @@ function setup(card: ProductivityView['card']) {
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe('temporary productivity cards', () => {
+  it('keeps input, reading-panel and card close buttons in hit testing and routes each close correctly', async () => {
+    vi.stubGlobal('requestAnimationFrame', vi.fn()); const { ui, state, api } = setup('tasks');
+    const end = vi.fn(); const panel = vi.fn(); Object.assign(window.ducky, { talkEnd: end, talkPanel: panel });
+    const conversation = new ConversationUI(new Node() as unknown as HTMLElement, new Node() as unknown as HTMLButtonElement, { setConversationState: vi.fn(), setTalking: vi.fn() } as unknown as CharacterSurface);
+    state.conversation = { active: true, inputReady: true, state: 'listening', reply: '', revision: 1, panel: false, shortcutError: '' };
+    conversation.render(state);
+    const inputClose = (conversation.inputShell as unknown as Node).querySelector('button')!;
+    expect(inputClose.attrs.get('aria-label')).toBe('Close'); expect(inputClose.textContent).toBe('×');
+    expect(conversation.hit(inputClose as unknown as Element)).toBe(true); inputClose.onclick!(); expect(end).toHaveBeenCalledOnce();
+    const cardClose = (ui.card as unknown as Node).querySelectorAll('button').find(b => b.attrs.get('aria-label') === 'Close')!;
+    expect(ui.hit(cardClose as unknown as Element)).toBe(true); cardClose.onclick!(); await Promise.resolve();
+    expect(api).toHaveBeenCalledWith({ name: 'close', args: {} }); expect(end).toHaveBeenCalledOnce();
+    conversation.panel.hidden = false; const panelClose = (conversation.panel as unknown as Node).querySelectorAll('button').find(b => b.attrs.get('aria-label') === 'Close')!;
+    expect(conversation.hit(panelClose as unknown as Element)).toBe(true); panelClose.onclick!();
+    expect(conversation.panel.hidden).toBe(true); expect(panel).toHaveBeenCalledWith(false); expect(end).toHaveBeenCalledOnce();
+    state.conversation.active = false; conversation.render(state); expect(conversation.hit(inputClose as unknown as Element)).toBe(false);
+    conversation.dispose(); ui.dispose();
+  });
+  it('shows interval schedules and occurrence actions, with Stop series only on repeating reminders', () => {
+    const { ui, view, state, api } = setup('reminder-due');
+    view.reminders[0].recurrence = { kind: 'interval', intervalMinutes: 30, window: { start: '09:00', end: '18:00' } }; view.revision++; ui.render(state);
+    expect(reminderLabel(view.reminders[0])).toBe('Every 30 minutes, 9:00 AM–6:00 PM');
+    const buttons = (ui.card as unknown as Node).querySelectorAll('button');
+    expect(buttons.map(b => b.textContent)).toEqual(['×', 'Done', 'Snooze 10 min', 'Stop series']);
+    buttons[3].onclick!(); expect(api).toHaveBeenCalledWith({ name: 'cancel_reminder', args: { id: 'r' } });
+    view.reminders[0].recurrence = undefined; view.revision++; ui.render(state);
+    expect((ui.card as unknown as Node).querySelectorAll('button').map(b => b.textContent)).not.toContain('Stop series'); ui.dispose();
+  });
   it('shows today and overdue open tasks, then undated tasks under No date, respecting search', () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 10, 25, 12));
     const { ui, view, state } = setup('tasks'); const base = view.tasks[0];
@@ -124,7 +152,7 @@ describe('Phase C companion affordances', () => {
     state.dnd = false; state.proactive = { label: 'Plan it', detail: malicious, dismissLabel: 'Later' }; state.bubble = 'A deadline'; ui.render(state);
     const card = body.children.find(n => n.attrs.get('aria-label') === 'Ducky suggestion')!;
     expect(card.hidden).toBe(false); expect(card.querySelector('p')?.textContent).toBe(malicious);
-    const buttons = card.querySelectorAll('button'); buttons[0].onclick!(); buttons[1].onclick!();
+    const buttons = card.querySelectorAll('button').filter(b => b.attrs.get('aria-label') !== 'Close'); buttons[0].onclick!(); buttons[1].onclick!();
     expect(command.mock.calls).toEqual([['proactive-accept'], ['proactive-later']]);
     state.gaming = true; ui.render(state); expect(card.hidden).toBe(true); expect(badge.hidden).toBe(true);
   });

@@ -1,6 +1,7 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { expect, it } from 'vitest';
 import { AppAwareness } from '../src/main/platform/awareness';
+import { ForegroundFocus } from '../src/main/platform/foreground';
 
 // Explicit opt-in only: this checks the actual Windows API/helper and discards app identity.
 it.skipIf(process.platform !== 'win32' || process.env.DUCKY_NATIVE_HELPER_TEST !== '1')('native helper emits a valid sample and exits on disable', async () => {
@@ -16,7 +17,12 @@ it.skipIf(process.platform !== 'win32' || process.env.DUCKY_NATIVE_HELPER_TEST !
     exited = new Promise<void>(resolve => child!.once('close', () => resolve()));
     return child;
   }) as typeof spawn;
-  const helper = new AppAwareness(() => { sampleTimes.push(Date.now()); if (sampleTimes.length === 2) resolveSample(); }, () => {}, () => [process.pid], launch);
+  let captureOutput = '';
+  const focus = new ForegroundFocus(((...args: unknown[]) => {
+    const output: unknown = Reflect.apply(execFileSync, undefined, args);
+    captureOutput = String(output); return output;
+  }) as typeof execFileSync);
+  const helper = new AppAwareness(() => { sampleTimes.push(Date.now()); if (sampleTimes.length === 2) resolveSample(); }, () => {}, () => [process.pid], launch, focus);
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     helper.configure(true);
@@ -27,10 +33,12 @@ it.skipIf(process.platform !== 'win32' || process.env.DUCKY_NATIVE_HELPER_TEST !
     ]);
     expect(result, stderr || 'No valid helper sample').toBe('sample');
     expect(sampleTimes[1] - sampleTimes[0]).toBeGreaterThanOrEqual(2900);
-    // Command is handled by the resident reader, not the three-second sample loop.
-    const capturedAt = Date.now();
-    await new Promise<void>(resolve => helper.captureForeground(() => resolve()));
-    expect(Date.now() - capturedAt).toBeLessThan(150);
+    // This is a synchronous Win32 read, independent of the sample loop.
+    const captured = helper.captureForeground();
+    // Win32 legitimately returns zero on a headless/restricted desktop. Still require
+    // a successful native command, not a swallowed launch/compile error or timeout.
+    expect(captureOutput.trim()).toMatch(/^[0-9]+$/);
+    expect(captured).toBe(captureOutput.trim() === '0' ? undefined : captureOutput.trim());
     helper.configure(false);
     await exited;
     expect(child!.exitCode !== null || child!.signalCode !== null).toBe(true);

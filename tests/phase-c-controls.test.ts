@@ -18,6 +18,8 @@ describe('Phase C tray and settings', () => {
     const command = vi.fn(), settings = vi.fn(); const tray = new DuckyTray(() => state, command, settings);
     type Item = { label: string; checked?: boolean; submenu?: Item[]; click?: () => void };
     const menu = tray.menu() as unknown as Item[];
+    expect(menu.some(i => /^(?:Tasks|Add task|Add reminder|Notes|Start focus)/.test(i.label ?? ''))).toBe(false);
+    for (const label of ['Talk to Ducky', 'Show Ducky', 'Hide Ducky', 'Pause', 'Mute', 'Privacy mode', 'Settings…', 'Quit']) expect(menu.some(i => i.label === label)).toBe(true);
     expect(menu[0].label).toBe('Mode: privacy');
     const dnd = menu.find(i => i.label.startsWith('Do not disturb'))!;
     for (const item of dnd.submenu!) item.click!();

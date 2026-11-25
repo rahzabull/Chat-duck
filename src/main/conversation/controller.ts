@@ -10,7 +10,7 @@ import { needsReadingPanel } from '../../core/conversation/presentation';
 import { CATEGORIES, cleanText, type Category, type Conversation, type ConversationView, type LibraryAction, type ToolCall, type Turn, type UserMemory } from '../../core/conversation/types';
 import { TALK_LINES } from '../../core/dialogue/lines';
 import type { CompanionController } from '../companion/CompanionController';
-import { ToolRegistry } from '../tools';
+import { ToolRegistry, type ToolResult } from '../tools';
 import { needsClarification } from '../../core/conversation/validation';
 import { ConversationEngine } from './engine';
 import { ConversationStore } from './store';
@@ -22,7 +22,6 @@ export class ConversationController {
   private idle?: ReturnType<typeof setTimeout>; private blur?: ReturnType<typeof setTimeout>; private thinking?: ReturnType<typeof setTimeout>; private transition?: ReturnType<typeof setTimeout>;
   private focusTimer?: ReturnType<typeof setTimeout>;
   private focusBlocked = false; private activatingFocus = false; private disposed = false;
-  private opening = false; private openRequest = 0;
   private engine?: ConversationEngine; private registry: ToolRegistry;
   private retrieval = new KeywordRetrieval(); private epoch = 0;
   private summaryEpoch = 0;
@@ -68,7 +67,7 @@ export class ConversationController {
     this.publish();
   }
   private cancel(): void { this.summaryEpoch++; this.epoch++; this.engine?.cancel(); this.companion.setConversationInference(false); clearTimeout(this.thinking); this.thinking = undefined; }
-  private onBlur = (): void => { if (this.view.active) { this.view.inputReady = false; this.publish(); clearTimeout(this.blur); this.blur = setTimeout(() => this.end(), 20000); } };
+  private onBlur = (): void => { if (this.view.active) { clearTimeout(this.focusTimer); this.view.inputReady = false; this.publish(); clearTimeout(this.blur); this.blur = setTimeout(() => this.end(), 5000); } };
   private onFocus = (): void => {
     clearTimeout(this.blur); this.blur = undefined;
     if (this.view.active && !this.companion.state.productivity?.card && !this.focusBlocked && !this.activatingFocus) this.focusInput();
@@ -91,17 +90,14 @@ export class ConversationController {
     if (this.companion.aiBlocked()) this.end();
   }
   open(): void {
-    if (this.disposed || this.opening || this.companion.aiBlocked()) return;
+    if (this.disposed || this.companion.aiBlocked()) return;
     if (this.view.active) { this.activate(); return; }
-    this.opening = true; const request = ++this.openRequest;
-    this.companion.captureConversationFocus(() => {
-      if (this.disposed || request !== this.openRequest || this.companion.aiBlocked()) return;
-      this.opening = false; this.activate();
-    });
+    this.companion.captureConversationFocus();
+    this.activate();
   }
   private activate(): void {
     this.productivity?.open(null);
-    // Capture the previous foreground window before any activation calls.
+    // open() has synchronously captured the previous window before these activation calls.
     const window = this.companion.window;
     this.focusBlocked = false; this.view.focusFailed = false; clearTimeout(this.focusTimer);
     this.activatingFocus = true;
@@ -114,7 +110,7 @@ export class ConversationController {
       this.companion.beginConversation(); this.companion.setConversationInference(false);
       this.view.active = true; this.view.state = 'listening'; this.view.panel = false;
       this.view.inputReady = false;
-      this.show(line('talk_greeting'), 'listening', false);
+      this.show(line('talk_greeting') + (this.companion.consumeTalkHint() ? `\n${line('talk_hint')}` : ''), 'listening', false);
     }
     if (this.opener) { this.view.draft = { text: this.opener, revision: ++this.draftRevision }; this.opener = undefined; this.publish(); }
     this.focusInput(); this.touch();
@@ -179,6 +175,8 @@ export class ConversationController {
     this.productivity?.open(null);
     this.view.reply = ''; this.view.panel = false; this.view.revision++; this.view.state = 'thinking'; this.publish();
     this.turns.push({ role: 'user', text, at: Date.now() }); this.turns = this.turns.slice(-200);
+    let retry: { call: ToolCall; result: ToolResult } | undefined;
+    const canCorrect = (result: ToolResult) => result.failure?.kind === 'validation' && this.companion.state.settings.aiEnabled && !!this.companion.state.settings.aiModel;
     try {
       const modeIntent = parseIntent(text);
       if (modeIntent.kind === 'dnd') { this.companion.updateSettings({ dndUntil: modeIntent.enabled ? modeIntent.minutes ? Date.now() + modeIntent.minutes * 60000 : -1 : 0 }); this.end(); return; }
@@ -198,14 +196,17 @@ export class ConversationController {
         if (/^no$/i.test(text)) { this.show('Cancelled. Nothing changed.'); return; }
         const result = await this.registry.run(call, 0, true);
         if (epoch !== this.epoch || !this.view.active) return;
-        this.show(result.message, result.ok ? 'responding' : 'unsure');
-        return;
+        if (canCorrect(result)) retry = { call, result };
+        else { this.show(result.message, result.ok ? 'responding' : 'unsure'); return; }
       }
       this.confirmation = undefined;
-      if (this.productivity) {
+      if (this.productivity && !retry) {
         const productivity = await this.productivity.local(text);
         if (epoch !== this.epoch || !this.view.active) return;
-        if (productivity) { this.confirmation = productivity.confirmation; this.show(productivity.message, productivity.ok ? 'responding' : 'unsure'); return; }
+        if (productivity) {
+          if (canCorrect(productivity)) retry = { call: productivity.failure!.call, result: productivity };
+          else { this.confirmation = productivity.confirmation; this.show(productivity.message, productivity.ok ? 'responding' : 'unsure'); return; }
+        }
       }
       // Numeric productivity choices are handled before the model's input gate.
       if (needsClarification(text)) { this.show(line('talk_huh'), 'confused'); return; }
@@ -229,7 +230,7 @@ export class ConversationController {
       this.modelTurns.push({ role: 'user', text, at: Date.now() });
       this.modelTurns = this.modelTurns.slice(-200);
       this.thinking = setTimeout(() => { if (epoch === this.epoch && this.view.active) this.show(line('talk_still_thinking'), 'thinking', false); }, 8000);
-      const result = await this.engine!.reply({ settings: s, turns: [...this.modelTurns], memories: s.memoryEnabled ? this.retrieval.memories(text, this.store.memories, Date.now()) : [], summaries: s.memoryEnabled ? this.retrieval.conversations(text, this.store.conversations, Date.now()).map(c => ({ summary: c.summary, topics: c.topics, endedAt: c.endedAt })) : [], now: Date.now() });
+      const result = await this.engine!.reply({ settings: s, turns: [...this.modelTurns], memories: s.memoryEnabled ? this.retrieval.memories(text, this.store.memories, Date.now()) : [], summaries: s.memoryEnabled ? this.retrieval.conversations(text, this.store.conversations, Date.now()).map(c => ({ summary: c.summary, topics: c.topics, endedAt: c.endedAt })) : [], now: Date.now() }, retry);
       if (epoch !== this.epoch || !this.view.active) return;
       this.confirmation = result.confirmation;
       this.show(result.reply, ['neutral', 'warm'].includes(result.tone) ? 'responding' : result.tone as ConversationView['state']);
@@ -240,7 +241,7 @@ export class ConversationController {
     } finally { if (epoch === this.epoch) { clearTimeout(this.thinking); this.thinking = undefined; } }
   }
   end(save = true): void {
-    this.openRequest++; this.opening = false; this.opener = undefined; this.view.draft = undefined;
+    this.opener = undefined; this.view.draft = undefined;
     this.cancel(); if (!this.view.active) return;
     clearTimeout(this.idle); clearTimeout(this.blur); clearTimeout(this.transition); clearTimeout(this.focusTimer);
     this.view.active = false; this.view.state = 'conversation_end'; this.view.panel = false; this.view.reply = save && !this.companion.aiBlocked() && Math.random() < .4 ? line('talk_signoff') : ''; this.view.revision++;

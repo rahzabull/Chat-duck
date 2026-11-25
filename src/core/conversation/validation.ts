@@ -1,6 +1,10 @@
 import { isRecord } from '../../shared/schemas/settings';
 import { disallowedModelOutput, DisallowedOutputError } from '../content-safety';
 import { cleanText, TONES, TOOL_NAMES, type Reply } from './types';
+import { stripEmoji } from './output';
+export class InsufficientReplyError extends Error {
+  constructor() { super('Reply needs at least three words'); }
+}
 /** Count visible graphemes, excluding whitespace and invisible formatting. */
 export function needsClarification(text: string): boolean {
   const visible = text.replace(/[\p{White_Space}\p{Cf}]/gu, '');
@@ -18,8 +22,10 @@ export function validateReply(raw: string, names: readonly string[] = TOOL_NAMES
   const value: unknown = JSON.parse(raw);
   if (disallowedModelOutput(value)) throw new DisallowedOutputError();
   if (!isRecord(value) || Object.keys(value).sort().join(',') !== 'reply,tone,tool' || typeof value.reply !== 'string' || value.reply.length > 4000) throw new Error('Invalid response');
-  const reply = cleanText(value.reply); if (!reply) throw new Error('Empty response');
   if (value.tool !== null && (!isRecord(value.tool) || Object.keys(value.tool).sort().join(',') !== 'args,name' || typeof value.tool.name !== 'string' || !names.includes(value.tool.name) || !isRecord(value.tool.args))) throw new Error('Unknown or invalid tool');
+  const reply = cleanText(stripEmoji(value.reply));
+  const words = [...new Intl.Segmenter(undefined, { granularity: 'word' }).segment(reply)].filter(part => part.isWordLike);
+  if (words.length < 3) throw new InsufficientReplyError();
   return { reply, tone: TONES.includes(value.tone as never) ? value.tone as Reply['tone'] : 'neutral', tool: value.tool as Reply['tool'] };
 }
 

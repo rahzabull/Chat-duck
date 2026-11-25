@@ -1,48 +1,61 @@
-:root { color-scheme: light; font-family: "Segoe UI", sans-serif; }
+@import '../shared/tokens.css';
 * { box-sizing: border-box; }
 html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent !important; user-select: none; }
+[hidden] { display: none !important; }
 #character { position: absolute; inset: 0; touch-action: none; pointer-events: none; }
-#bubble { position: absolute; bottom: 57%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 75%; max-height: 40%; overflow: hidden; border: 1px solid #c7c8b5; border-radius: 5vw; padding: 3.75vw 4.6875vw; background: #fffef3; color: #29382c; font: 4.375vw/1.4 "Segoe UI", sans-serif; text-align: left; white-space: normal; overflow-wrap: anywhere; cursor: pointer; box-shadow: 0 3px 7px #00000018; animation: pop .18s ease-out; }
-#bubble[hidden] { display: none; }
-#bubble.debug { outline: 1px dashed #28775c88; }
+#bubble { position: absolute; bottom: 57%; left: 50%; transform: translateX(-50%); width: max-content; max-width: min(240px, 95%); max-height: 55%; overflow: auto; border: 2.5px solid var(--ink); border-radius: 20px; padding: 12px 16px; background: var(--surface-card); color: var(--ink); font: 20px/1.2 var(--font-ducky); text-align: left; white-space: normal; overflow-wrap: anywhere; cursor: pointer; box-shadow: 0 3px 7px #00000018; animation: pop .18s ease-out; }
+#bubble.debug { outline: 1px dashed var(--accent-blue); }
 .reduced #bubble { animation: none; }
 @media (prefers-reduced-motion: reduce) { #bubble { animation: none; } }
 @keyframes pop { from { opacity: 0; transform: translate(-50%, 4px); } }
+.conversing #bubble { white-space: pre-line; left: var(--response-left); bottom: var(--response-bottom); transform: none; max-width: min(240px, var(--response-width)); max-height: var(--response-height); animation: none; }
 
-#talk-input { position: absolute; left: var(--response-left); bottom: max(4px, calc(var(--response-bottom) - 84px)); width: var(--response-width); height: 34px; max-height: 76px; resize: none; border: 1px solid #68866c; border-radius: 12px; background: #fffef3; color: #29382c; padding: 7px 10px; font: 14px/20px "Segoe UI", sans-serif; user-select: text; outline-offset: -3px; transition: opacity .18s; }
-#talk-input.ending { opacity: 0; pointer-events: none; }
-.conversing #bubble { white-space: pre-line; left: var(--response-left); bottom: var(--response-bottom); transform: none; max-width: var(--response-width); max-height: var(--response-height); border-radius: 16px; padding: 10px 13px; font-size: 14px; animation: none; }
-#reading-panel { position: absolute; left: var(--response-left); bottom: var(--response-bottom); width: var(--response-width); max-width: 420px; max-height: min(360px, var(--response-height)); background: #fffef3; color: #29382c; border: 1px solid #aabda5; border-radius: 14px; box-shadow: 0 3px 8px #0002; padding: 10px; font: 14px/1.45 "Segoe UI", sans-serif; user-select: text; }
-.reading-controls { display: flex; gap: 6px; margin-bottom: 6px; }
-.reading-controls button { border: 1px solid #c4d1bc; border-radius: 6px; padding: 4px 8px; background: #f0f4e7; color: inherit; cursor: pointer; }
-.reading-content { max-height: min(140px, calc(var(--response-height) - 58px)); overflow: auto; overflow-wrap: anywhere; }
-#reading-panel.expanded .reading-content { max-height: min(302px, calc(var(--response-height) - 58px)); }
-.reading-content p { margin: 0 0 9px; } .reading-content ul, .reading-content ol { padding-left: 22px; }
-.reading-content pre { white-space: pre-wrap; padding: 8px; background: #eaf0e4; border-radius: 6px; }
-.reading-content code { background: #eaf0e4; font-size: 12px; }
-#reading-panel[hidden], #talk-input[hidden] { display: none; }
-.reduced #talk-input { transition: none; }
-#productivity-card, #focus-badge { position: absolute; z-index: 4; background: #fffef3; color: #29382c; border: 1px solid #aabda5; border-radius: 14px; box-shadow: 0 3px 8px #0002; padding: 10px; font: 14px/1.4 "Segoe UI", sans-serif; user-select: text; overflow: auto; overflow-wrap: anywhere; }
-#productivity-card { max-width: 420px; max-height: 420px; }
-#productivity-card[hidden], #focus-badge[hidden] { display: none; }
-#productivity-card header, #productivity-card nav, #focus-badge { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-#productivity-card header { justify-content: space-between; }
-#productivity-card input:not([type=checkbox]), #productivity-card textarea { width: 100%; min-width: 0; border: 1px solid #b6c4ae; border-radius: 6px; padding: 6px; margin: 4px 0; background: white; color: inherit; font: inherit; user-select: text; }
+#talk-input-shell { position: absolute; z-index: 5; left: var(--response-left); bottom: max(4px, calc(var(--response-bottom) - 92px)); width: var(--response-width); min-height: 44px; border: 2.5px solid var(--ink); border-radius: 22px; background: var(--surface-card); }
+#talk-input { display: block; width: 100%; height: 39px; max-height: 39px; overflow: auto; resize: none; border: 0; border-radius: 22px; background: transparent; color: var(--ink); padding: 9px 42px 8px 14px; font: 14px/20px var(--font-ui); user-select: text; outline-offset: -3px; }
+#talk-input::placeholder { color: var(--text-secondary); }
+#talk-input-shell > .close-button { position: absolute; right: 6px; top: 5.5px; }
+
+#reading-panel, #productivity-card, #focus-badge, #proactive-actions { position: absolute; z-index: 4; background: var(--surface-card); color: var(--ink); border: 2.5px solid var(--ink); border-radius: 20px; padding: 14px 16px; font: 14px/1.4 var(--font-ui); user-select: text; overflow: auto; overflow-wrap: anywhere; box-shadow: 0 3px 8px #0002; }
+#reading-panel { left: var(--response-left); bottom: var(--response-bottom); width: min(380px, var(--response-width)); max-height: min(360px, var(--response-height)); }
+#reading-panel header, #productivity-card header, #proactive-actions header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+#reading-panel header strong, #productivity-card header strong, #proactive-actions header strong { font-size: 16px; }
+.reading-controls { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.reading-content { max-height: min(140px, calc(var(--response-height) - 110px)); overflow: auto; overflow-wrap: anywhere; }
+#reading-panel.expanded .reading-content { max-height: min(250px, calc(var(--response-height) - 110px)); }
+.reading-content p { margin: 0 0 9px; }
+.reading-content ul, .reading-content ol { padding-left: 22px; }
+.reading-content pre { white-space: pre-wrap; padding: 8px; background: var(--surface-muted); border-radius: 12px; }
+.reading-content code { background: var(--surface-muted); font-size: 12px; }
+#productivity-card { max-width: 320px; max-height: 420px; }
+#productivity-card nav, #focus-badge { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#productivity-card input:not([type=checkbox]), #productivity-card textarea { width: 100%; min-width: 0; border: 1.5px solid var(--line-soft); border-radius: 12px; padding: 6px 9px; margin: 4px 0; background: var(--surface-card); color: inherit; font: inherit; user-select: text; }
+#productivity-card input[aria-label^='Search'], #productivity-card input[aria-label^='+ Add'] { background: var(--surface-muted); border-radius: 20px; }
+#productivity-card input::placeholder { color: var(--text-secondary); }
 #productivity-card textarea { min-height: 90px; resize: vertical; }
-#productivity-card article { border-top: 1px solid #d9e1d0; padding: 8px 0; }
-#productivity-card h3 { font-size: 12px; margin: 10px 0 4px; color: #52654b; }
-#productivity-card button, #productivity-card select, #focus-badge button { border: 1px solid #bbcbb1; border-radius: 6px; padding: 4px 7px; margin: 3px 2px; background: #eef4e7; color: inherit; cursor: pointer; font: inherit; }
-#productivity-card button[aria-pressed=true] { background: #d4e8c6; }
-#productivity-card :focus-visible, #focus-badge :focus-visible { outline: 2px solid #23734a; outline-offset: 1px; }
-#productivity-card .task-title { display: flex; gap: 6px; align-items: center; }
-#productivity-card p { margin: 6px 0; } #productivity-card details { margin: 6px 0; }
-#productivity-card summary { cursor: pointer; } #productivity-card label { display: block; }
-#focus-badge { border-radius: 20px; padding: 3px 8px; font-size: 12px; }
-.productivity-open #reading-panel { display: none; }
-.productivity-open #bubble { display: none; }
-
-#mode-badge { position: absolute; bottom: 26%; left: 67%; font: 19px/1.2 "Segoe UI", sans-serif; padding: 2px 5px; border-radius: 12px; background: #fffef3; color: #29382c; pointer-events: none; }
-#proactive-actions { position: absolute; top: calc(43% + 6px); left: 8%; width: 84%; padding: 6px; border-radius: 10px; background: #fffef3; color: #29382c; font: 12px/1.3 "Segoe UI", sans-serif; border: 1px solid #c7c8b5; }
+#productivity-card article { border-top: 1.5px solid var(--line-soft); padding: 8px 0; }
+#productivity-card h3, #productivity-card small { font-size: 12px; color: var(--text-secondary); }
+#productivity-card h3 { margin: 10px 0 4px; }
+#reading-panel button:not(.close-button), #productivity-card button:not(.close-button), #productivity-card select, #focus-badge button:not(.close-button), #proactive-actions button:not(.close-button) { border: 2px solid var(--ink); border-radius: 20px; padding: 5px 9px; margin: 3px 2px; background: var(--surface-card); color: inherit; cursor: pointer; font: 600 13px/1.3 var(--font-ui); min-height: 28px; }
+#productivity-card nav button:not(.close-button) { background: var(--surface-muted); padding: 4px 7px; }
+#productivity-card nav button[aria-pressed=true], #productivity-card button.primary, #productivity-card button[type=submit], #proactive-actions > button:first-of-type { background: var(--duck-yellow); }
+#productivity-card .task-title { display: flex; gap: 8px; align-items: center; }
+#productivity-card input[type=checkbox] { appearance: none; width: 20px; height: 20px; flex: 0 0 20px; border: 2px solid var(--ink); border-radius: 6px; background: var(--surface-card); cursor: pointer; }
+#productivity-card input[type=checkbox]:checked { background: var(--duck-yellow); }
+#productivity-card input[type=checkbox]:checked::after { content: '✓'; display: block; font: bold 14px/16px var(--font-ui); text-align: center; }
+#productivity-card .done .task-title input:not([type=checkbox]) { text-decoration: line-through; color: var(--text-secondary); }
+#productivity-card .task-row > input { font-size: 12px; color: var(--text-secondary); }
+#productivity-card p { margin: 6px 0; }
+#productivity-card .ducky-quip { font: 20px/1.2 var(--font-ducky); }
+#productivity-card details { margin: 6px 0; }
+#productivity-card summary { cursor: pointer; }
+#productivity-card label { display: block; }
+#productivity-card button.note-item { display: block; width: 100%; border: 1.5px solid var(--line-soft); border-radius: 12px; padding: 10px; text-align: left; font-weight: 400; }
+#focus-badge { border-radius: 24px; padding: 4px 8px; font-size: 13px; background: var(--duck-yellow); overflow: visible; }
+.productivity-open #reading-panel, .productivity-open #bubble { display: none; }
+#mode-badge { position: absolute; bottom: 20%; right: 2%; max-width: 96%; font: 12px/1.4 var(--font-ui); padding: 4px 8px; border: 1.5px solid var(--ink); border-radius: 20px; background: var(--surface-card); color: var(--ink); pointer-events: none; }
+#proactive-actions { top: calc(43% + 6px); left: 2%; width: 96%; max-width: 320px; max-height: 55%; }
 #proactive-actions p { margin: 0 0 4px; }
-#proactive-actions button { background: #eef4e7; border: 1px solid #bbcbb1; border-radius: 6px; padding: 3px 7px; margin-right: 5px; color: inherit; cursor: pointer; }
-#proactive-actions[hidden], #mode-badge[hidden], .gaming #bubble, .gaming #productivity-card, .gaming #focus-badge, .gaming #reading-panel, .gaming #talk-input { display: none; }
+.gaming #bubble, .gaming #productivity-card, .gaming #focus-badge, .gaming #reading-panel, .gaming #talk-input-shell { display: none; }
+
+#focus-badge button:not(.close-button) { margin: 0; }
+#reading-panel header, #productivity-card header, #proactive-actions header { position: sticky; top: -14px; z-index: 1; background: var(--surface-card); padding-bottom: 4px; }

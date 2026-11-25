@@ -96,8 +96,19 @@ describe('presentation and safe markdown', () => {
   });
 });
 describe('conversation boundaries', () => {
+  it.each(['🦆', '👨‍👩‍👧‍👦', '👍🏽', '🇮🇳', '1️⃣', '#️⃣', '❤️', '🏴󠁧󠁢󠁥󠁮󠁧󠁿'])('strips emoji %s without touching ASCII emoticons or ordinary digits', emoji => {
+    const result = validateReply(JSON.stringify({ reply: `${emoji} Ducks have 3 eyelids. :) <3`, tone: 'warm', tool: null }));
+    expect(result.reply).toBe('Ducks have 3 eyelids. :) <3');
+    expect(guardedReply(`Ducks ${emoji} have feathers. :)`)).not.toContain(emoji);
+  });
+  it.each(['', '🦆', 'Hello 🦆', 'Two words 🦆', '... :)', 'one ... two', '\u200b'])('rejects fewer than three words after emoji stripping: %j', reply => {
+    expect(() => validateReply(JSON.stringify({ reply, tone: 'warm', tool: null }))).toThrow('three words');
+  });
+  it.each(['Invalid tool arguments. No operation performed.', 'TypeError: private stack', 'TOOL_ERROR validation rejected', 'Error: ENOENT secret-path'])('never publishes a raw diagnostic: %s', reply => {
+    expect(TALK_LINES.talk_tool_failed).toContain(guardedReply(reply));
+  });
   it('strips controls, defaults tone, and rejects unknown tools and malformed output', () => {
-    expect(validateReply(JSON.stringify({ reply: '\u0000 Hi\nthere', tone: 'odd', tool: null }))).toEqual({ reply: 'Hi\nthere', tone: 'neutral', tool: null });
+    expect(validateReply(JSON.stringify({ reply: '\u0000 Hi\nthere friend', tone: 'odd', tool: null }))).toEqual({ reply: 'Hi\nthere friend', tone: 'neutral', tool: null });
     for (const value of ['no JSON', '{}', JSON.stringify({ reply: '', tone: 'warm', tool: null }), JSON.stringify({ reply: 'x'.repeat(4001), tone: 'warm', tool: null }), JSON.stringify({ reply: 'Hi', tone: 'warm', tool: { name: 'shell', args: {} } })]) expect(() => validateReply(value)).toThrow();
   });
   it('validates shortcut, retention and strict IPC arguments', () => {

@@ -1,0 +1,25 @@
+@import '@fontsource/gochi-hand/latin-400.css';
+
+:root {
+  --ink: #232323;
+  --duck-yellow: #FFC954;
+  --duck-orange: #F7673B;
+  --surface-card: #FFFDF3;
+  --surface-muted: #FFF3D1;
+  --text-secondary: #6B6455;
+  --line-soft: #E9DFC4;
+  --accent-blue: #A8DDF5;
+  --font-ui: Inter, 'Segoe UI', sans-serif;
+  --font-ducky: 'Gochi Hand', cursive;
+  color-scheme: light;
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+.close-button {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px;
+  width: 28px; height: 28px; min-width: 28px; min-height: 28px;
+  padding: 0; margin: 0; border: 2px solid var(--ink); border-radius: 50%;
+  background: var(--surface-card); color: var(--ink); font: 22px/1 var(--font-ui); cursor: pointer;
+}
+:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }

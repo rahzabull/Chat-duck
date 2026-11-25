@@ -20,7 +20,9 @@ export function validReminder(v: unknown): v is Reminder {
   return r === undefined || (record(r) && (r.kind === 'daily' ||
     (r.kind === 'weekly' && Array.isArray(r.weekdays) && r.weekdays.length > 0 && r.weekdays.length <= 7 && r.weekdays.every((n: unknown) => Number.isInteger(n) && Number(n) >= 0 && Number(n) <= 6)) ||
     (r.kind === 'monthly' && Number.isInteger(r.dayOfMonth) && r.dayOfMonth >= 1 && r.dayOfMonth <= 31) ||
-    (r.kind === 'custom' && Number.isInteger(r.intervalDays) && r.intervalDays >= 1 && r.intervalDays <= 3650)));
+    (r.kind === 'custom' && Number.isInteger(r.intervalDays) && r.intervalDays >= 1 && r.intervalDays <= 3650) ||
+    (r.kind === 'interval' && Number.isSafeInteger(r.intervalMinutes) && r.intervalMinutes >= 5 && Date.parse(v.createdAt) + r.intervalMinutes * 60000 <= 8640000000000000 &&
+      (r.window === undefined || record(r.window) && time(r.window.start) && time(r.window.end) && r.window.start < r.window.end))));
 }
 export function validNote(v: unknown): v is Note { return record(v) && text(v.id, 80) && text(v.text, 20000) && optional(v.title) && optional(v.topic, 100) && iso(v.createdAt) && iso(v.updatedAt) && typeof v.pinned === 'boolean'; }
 export function validFocus(v: unknown): v is FocusData {

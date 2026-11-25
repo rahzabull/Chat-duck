@@ -264,22 +264,29 @@ export class CompanionController {
     if (kind !== 'focus') this.react(kind, 'happy', kind === 'alarm' ? 3000 : 1200);
     else this.setAnimation('focus');
   }
-  captureConversationFocus(ready: () => void): void {
-    this.awareness.captureForeground(hwnd => { this.conversationHwnd = hwnd; ready(); });
+  captureConversationFocus(): void {
+    this.conversationHwnd = this.awareness.captureForeground();
+    if (!app.isPackaged) console.debug('[ducky:focus]', this.conversationHwnd ? 'capture: synchronous fg' : 'capture: unavailable');
   }
   releaseConversationFocus(): void {
-    if (this.rawFullscreen || this.state.gaming) { this.conversationHwnd = undefined; this.window.setFocusable(false); return; }
-    if (this.state.productivity?.card) return;
+    if (this.rawFullscreen || this.state.gaming) { this.conversationHwnd = undefined; this.window.setFocusable(false); if (!app.isPackaged) console.debug('[ducky:focus]', 'restore: blocked by fullscreen'); return; }
+    if (this.state.productivity?.card) { if (!app.isPackaged) console.debug('[ducky:focus]', 'restore: deferred for card'); return; }
     // This hide only yields native focus; it must not invoke the user-hide path.
     this.releasingConversationFocus = true;
     try {
-      const known = this.conversationHwnd !== undefined;
-      if (this.conversationHwnd !== undefined) this.awareness.restoreForeground(this.conversationHwnd);
+      const restored = this.conversationHwnd !== undefined && this.awareness.restoreForeground(this.conversationHwnd);
+      if (!app.isPackaged) console.debug('[ducky:focus]', restored ? 'restore: captured HWND' : this.conversationHwnd ? 'restore: captured HWND failed; yield' : 'restore: no capture; yield');
       this.conversationHwnd = undefined;
       this.window.setFocusable(false);
-      if (!known) { this.window.hide(); this.window.showInactive(); }
+      if (!restored) { this.window.hide(); this.window.showInactive(); }
       this.window.setAlwaysOnTop(this.store.value.alwaysOnTop && !this.store.value.desktopOnly, 'screen-saver');
     } finally { this.releasingConversationFocus = false; }
+  }
+  consumeTalkHint(): boolean {
+    if (this.store.value.talkHintCount >= 3) return false;
+    this.store.update({ talkHintCount: this.store.value.talkHintCount + 1 });
+    this.store.flush(); this.state.settings = this.store.value;
+    return true;
   }
   beginConversation(): void {
     clearTimeout(this.conversationQuietTimer); this.conversationQuietTimer = undefined;

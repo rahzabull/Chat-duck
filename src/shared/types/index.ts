@@ -36,9 +36,10 @@ export interface Settings {
   aiModel: string;
   ollamaPort: number;
   firstLaunchDone: boolean;
+  talkHintCount: number;
   position: Point | null;
 }
-export type EditableSettings = Omit<Settings, 'firstLaunchDone' | 'position' | 'installSeed' | 'dailyMood' | 'proactiveHistory'>;
+export type EditableSettings = Omit<Settings, 'firstLaunchDone' | 'talkHintCount' | 'position' | 'installSeed' | 'dailyMood' | 'proactiveHistory'>;
 export interface BrainState {
   phase: 'disabled' | 'offline' | 'warming' | 'connected' | 'error' | 'suspended';
   message: string;

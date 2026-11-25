@@ -3,9 +3,11 @@ import type { CompanionState } from '../../shared/types';
 import { needsReadingPanel, readingTime, splitBeats } from '../../core/conversation/presentation';
 import { renderMarkdown } from './markdown';
 import { guardedReply } from '../../core/conversation/output';
+import { closeButton } from '../shared/close';
 export class ConversationUI {
   readonly input = document.createElement('textarea');
   readonly panel = document.createElement('section');
+  readonly inputShell = document.createElement('div');
   private content = document.createElement('div');
   private controls = document.createElement('div');
   private timer?: ReturnType<typeof setTimeout>;
@@ -25,18 +27,20 @@ export class ConversationUI {
     const expand = button('Expand', () => { this.panel.classList.toggle('expanded'); expand.textContent = this.panel.classList.contains('expanded') ? 'Collapse' : 'Expand'; });
     this.copy = button('Copy', () => { void window.ducky.talkCopy().then(() => { this.copy.textContent = 'Copied'; }).catch(() => { this.copy.textContent = 'Copy failed'; }); });
     for (const pinned of [false, true]) { const save = button(pinned ? 'Pin' : 'Save', () => { save.disabled = true; void window.ducky.talkSave(pinned).then(r => { save.textContent = r.ok ? 'Saved' : 'Save failed'; }).catch(() => { save.textContent = 'Save failed'; }).finally(() => { save.disabled = false; }); }); }
-    button('Close', () => { this.panel.hidden = true; window.ducky.talkPanel(false); this.input.focus(); this.stopSpeaking(); });
-    this.panel.append(this.controls, this.content); document.body.append(this.panel, this.input);
-    this.panel.hidden = true; this.input.hidden = true;
+    const header = document.createElement('header'); const title = document.createElement('strong'); title.textContent = 'Ducky';
+    header.append(title, closeButton(() => { this.panel.hidden = true; window.ducky.talkPanel(false); this.input.focus(); this.stopSpeaking(); }));
+    this.inputShell.id = 'talk-input-shell';
+    this.inputShell.append(this.input, closeButton(() => { void window.ducky.talkEnd(); }));
+    this.panel.append(header, this.controls, this.content); document.body.append(this.panel, this.inputShell);
+    this.panel.hidden = true; this.input.hidden = true; this.inputShell.hidden = true;
     this.input.addEventListener('input', () => {
-      this.input.style.height = 'auto'; this.input.style.height = `${Math.min(76, this.input.scrollHeight)}px`;
       this.stopSpeaking(); this.bubble.hidden = true; this.panel.hidden = true;
       window.ducky.talkTyping();
     });
     this.input.addEventListener('keydown', event => {
       if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
         event.preventDefault(); const text = this.input.value.trim(); if (!text) return;
-        this.input.value = ''; this.input.style.height = ''; this.stopSpeaking(); this.bubble.hidden = true; this.panel.hidden = true;
+        this.input.value = ''; this.stopSpeaking(); this.bubble.hidden = true; this.panel.hidden = true;
         void window.ducky.talkSend(text).catch(() => { if (this.active) { this.bubble.textContent = 'Couldn’t send that. Try again?'; this.bubble.hidden = false; } });
       }
     });
@@ -45,7 +49,7 @@ export class ConversationUI {
       if (event.key === 'Escape' && this.active && !this.cardOpen) { event.preventDefault(); void window.ducky.talkEnd(); }
     }, true);
   }
-  hit(element: Element | null): boolean { return !!element && ((!this.input.hidden && this.input.contains(element)) || (!this.panel.hidden && this.panel.contains(element))); }
+  hit(element: Element | null): boolean { return !!element && ((!this.inputShell.hidden && this.inputShell.contains(element)) || (!this.panel.hidden && this.panel.contains(element))); }
   clickToType(): boolean {
     if (!this.active || !this.focusFailed || this.inputReady) return false;
     window.ducky.doubleClick(); return true;
@@ -85,6 +89,7 @@ export class ConversationUI {
     this.focusFailed = focusFailed;
     if (ready && !this.inputReady) this.revision = -1;
     this.inputReady = ready; this.input.disabled = !ready;
+    this.inputShell.hidden = !this.active;
     if (this.active) {
       this.input.hidden = !ready;
       if (!this.wasActive) this.input.value = '';

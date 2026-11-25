@@ -1,42 +1,32 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import type { spawn } from 'node:child_process';
+import type { spawn, execFileSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppAwareness } from '../src/main/platform/awareness';
+import { ForegroundFocus } from '../src/main/platform/foreground';
 import { awarenessScript } from '../src/main/platform/awareness-script';
 function fakeChild() {
   return Object.assign(new EventEmitter(), { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), kill: vi.fn(() => true) });
 }
 afterEach(() => vi.useRealTimers());
 describe('foreground helper lifecycle', () => {
-  it('captures an immediate HWND before the next sample and restores only validated handles', () => {
-    const child = fakeChild(); const sample = vi.fn(); const sent: string[] = [];
-    child.stdin.on('data', chunk => sent.push(String(chunk)));
-    const helper = new AppAwareness(sample, vi.fn(), () => [42], vi.fn(() => child) as unknown as typeof spawn);
-    helper.configure(true, false); child.stdout.write('unknown|0|111\n');
-    expect(sample).toHaveBeenLastCalledWith({ app: null, fullscreen: false });
-    const ready = vi.fn(); helper.captureForeground(ready); expect(sent.at(-1)).toBe('fg\n'); expect(ready).not.toHaveBeenCalled();
-    child.stdout.write('hwnd|22'); child.stdout.write('2\r\n'); expect(ready).toHaveBeenCalledWith('222');
-    expect(sample).toHaveBeenCalledOnce(); expect(helper.restoreForeground('222')).toBe(true); expect(sent.at(-1)).toBe('restore 222\n');
-    for (const value of ['', '0', '-1', '1.2', '1\nfg', '123\n', '123\r', ' 123', '１２３', '9223372036854775808']) expect(helper.restoreForeground(value)).toBe(false);
-    expect(sent.filter(s => s.startsWith('restore'))).toEqual(['restore 222\n']); helper.dispose(); child.emit('close');
+  it('captures synchronously even with awareness disabled and never uses a sampled handle', () => {
+    const child = fakeChild(); const run = vi.fn().mockReturnValue('222');
+    const focus = new ForegroundFocus(run as unknown as typeof execFileSync, 'win32');
+    const helper = new AppAwareness(vi.fn(), vi.fn(), () => [], vi.fn(() => child) as unknown as typeof spawn, focus);
+    expect(helper.captureForeground()).toBe('222');
+    helper.configure(true); child.stdout.write('chrome.exe|0|111\n');
+    run.mockImplementationOnce(() => { throw new Error('Timed out'); });
+    expect(helper.captureForeground()).toBeUndefined();
+    helper.configure(false); child.emit('close');
+    run.mockReturnValue('333'); expect(helper.captureForeground()).toBe('333');
+    run.mockReturnValue('True'); expect(helper.restoreForeground('333')).toBe(true);
+    helper.dispose();
   });
-  it('falls back to the last sampled handle on timeout or unavailable helper, with no handle on a fresh start', () => {
-    vi.useFakeTimers(); const child = fakeChild();
-    const helper = new AppAwareness(vi.fn(), vi.fn(), () => [], vi.fn(() => child) as unknown as typeof spawn);
-    const ready = vi.fn(); helper.captureForeground(ready); expect(ready).toHaveBeenLastCalledWith(undefined);
-    helper.configure(true); child.stdout.write('private|0|456\n'); helper.captureForeground(ready);
-    child.stdout.write('hwnd|-1\nhwnd|12x\nunknown|0|123\n');
-    vi.advanceTimersByTime(150); expect(ready).toHaveBeenLastCalledWith('123');
-    helper.configure(false); child.emit('close'); helper.captureForeground(ready); expect(ready).toHaveBeenLastCalledWith('123');
-    expect(helper.restoreForeground('123')).toBe(false);
-    helper.dispose(); helper.captureForeground(ready); expect(ready).toHaveBeenLastCalledWith(undefined); expect(vi.getTimerCount()).toBe(0);
-  });
-  it('keeps foreground commands independent of identity lookup and restricts the input grammar', () => {
+  it('keeps sampling independent of synchronous focus commands and identity lookup', () => {
     const script = awarenessScript(123, [], false);
-    expect(script).toContain('line == "fg"'); expect(script).toContain('Console.Out.WriteLine("hwnd|" + GetForegroundWindow().ToInt64())');
-    expect(script).toContain('\\Arestore [0-9]+\\z'); expect(script).toContain('\\A[0-9]+(,[0-9]+)*\\z');
-    expect(script).toContain('if (IsWindow(hwnd)) SetForegroundWindow(hwnd)');
+    expect(script).not.toContain('line == "fg"');
+    expect(script).not.toContain('SetForegroundWindow');
     expect(script).not.toContain('QueryFullProcessImageName'); expect(script).not.toContain('GetWindowThreadProcessId');
   });
   it('switches geometry/identity modes without recursion, overlap or leaking names', () => {

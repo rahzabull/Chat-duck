@@ -43,10 +43,70 @@ describe('tool permissions and honest results', () => {
     expect(t.execute).not.toHaveBeenCalled();
     vi.mocked(t.execute).mockImplementation(() => { throw new Error('Disk full'); });
     const result = await registry.run({ name: 'remember', args: { text: 'x' } }, 0);
-    expect(result.ok).toBe(false); expect(result.message).toContain('failed');
+    expect(result.ok).toBe(false); expect(TALK_LINES.talk_tool_failed).toContain(result.message);
   });
 });
 describe('conversation engine with fake provider', () => {
+  it.each(['🦆', '🦆🦆🦆', '  ', '', 'Okay', 'Fun fact! 🦆', '... :)', '👨‍👩‍👧‍👦 👍🏽 🇮🇳 1️⃣'])('regenerates a near-empty reply %j once with an answer-in-words instruction', async reply => {
+    const p = provider();
+    vi.mocked(p.generate).mockResolvedValueOnce(response(reply)).mockResolvedValueOnce(response('🦆 Ducks have waterproof feathers. :)'));
+    const result = await new ConversationEngine(p, new ToolRegistry([])).reply(context);
+    expect(result.reply).toBe('Ducks have waterproof feathers. :)'); expect(p.generate).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(p.generate).mock.calls[1][0].messages.at(-1)?.content).toContain('answer in words');
+  });
+  it.each(['🦆', 'Two words', '... :)'])('uses talk_error after two invalid word replies: %s', async reply => {
+    const p = provider(); vi.mocked(p.generate).mockResolvedValue(response(reply));
+    const result = await new ConversationEngine(p, new ToolRegistry([])).reply(context);
+    expect(TALK_LINES.talk_error).toContain(result.reply); expect(p.generate).toHaveBeenCalledTimes(2);
+  });
+  it('uses talk_error when word regeneration is unavailable', async () => {
+    const p = provider(); vi.mocked(p.generate).mockResolvedValueOnce(response('🦆')).mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    expect(TALK_LINES.talk_error).toContain((await new ConversationEngine(p, new ToolRegistry([])).reply(context)).reply);
+  });
+  it.each([['🦆', 'idiot'], ['idiot', '🦆']])('shares one regeneration budget across invalid replies %s then %s', async (first, second) => {
+    const p = provider(); vi.mocked(p.generate).mockResolvedValueOnce(response(first)).mockResolvedValueOnce(response(second));
+    expect(TALK_LINES.talk_error).toContain((await new ConversationEngine(p, new ToolRegistry([])).reply(context)).reply);
+    expect(p.generate).toHaveBeenCalledTimes(2);
+  });
+  it('never executes a tool hidden in an emoji-only reply', async () => {
+    const p = provider(); const t = tool(); vi.mocked(p.generate).mockResolvedValue(response('🦆', { name: 'remember', args: { text: 'tea' } }));
+    expect(TALK_LINES.talk_error).toContain((await new ConversationEngine(p, new ToolRegistry([t])).reply(context)).reply);
+    expect(t.execute).not.toHaveBeenCalled(); expect(p.generate).toHaveBeenCalledTimes(2);
+  });
+  it('gives the model one validation correction and executes only the corrected arguments', async () => {
+    const p = provider(); const t = tool();
+    vi.mocked(p.generate).mockResolvedValueOnce(response('Let me save that.', { name: 'remember', args: { text: 7 } }))
+      .mockResolvedValueOnce(response('Let me fix that.', { name: 'remember', args: { text: 'tea' } })).mockResolvedValueOnce(response('I saved the memory.'));
+    const result = await new ConversationEngine(p, new ToolRegistry([t])).reply(context);
+    expect(result.reply).toBe('Saved the exact requested memory.'); expect(t.execute).toHaveBeenCalledExactlyOnceWith({ text: 'tea' });
+    const feedback = vi.mocked(p.generate).mock.calls[1][0].messages.at(-1)!.content;
+    expect(feedback).toContain('Invalid tool arguments'); expect(feedback).toContain('save a memory');
+  });
+  it.each(['invalid', 'claim', 'unavailable', 'wrong-tool'])('uses authored tool failure after unsuccessful correction: %s', async mode => {
+    const p = provider(); const t = tool();
+    vi.mocked(p.generate).mockResolvedValueOnce(response('Let me save that.', { name: 'remember', args: {} }));
+    if (mode === 'unavailable') vi.mocked(p.generate).mockRejectedValueOnce(new Error('private path and stack trace'));
+    else vi.mocked(p.generate).mockResolvedValueOnce(mode === 'claim' ? response('I saved that memory.') : response('Let me try again.', { name: mode === 'wrong-tool' ? 'other' : 'remember', args: {} }));
+    const result = await new ConversationEngine(p, new ToolRegistry([t, { ...t, name: 'other' }])).reply(context);
+    expect(TALK_LINES.talk_tool_failed).toContain(result.reply); expect(t.execute).not.toHaveBeenCalled(); expect(p.generate).toHaveBeenCalledTimes(2);
+  });
+  it('keeps permission confirmation after correcting invalid arguments', async () => {
+    const p = provider(); const t = tool('confirm');
+    vi.mocked(p.generate).mockResolvedValueOnce(response('Let me save that.', { name: 'remember', args: {} }))
+      .mockResolvedValueOnce(response('Let me fix that.', { name: 'remember', args: { text: 'tea' } }));
+    const result = await new ConversationEngine(p, new ToolRegistry([t])).reply(context);
+    expect(result.confirmation).toEqual({ name: 'remember', args: { text: 'tea' } }); expect(t.execute).not.toHaveBeenCalled();
+  });
+  it('catches validator exceptions and returned system errors without leaking either', async () => {
+    const t = tool(); const registry = new ToolRegistry([t]);
+    t.validate = () => { throw new Error('private validator details'); };
+    const invalid = await registry.run({ name: 'remember', args: {} }, 0);
+    expect(TALK_LINES.talk_tool_failed).toContain(invalid.message); expect(invalid.failure?.kind).toBe('validation');
+    expect(JSON.stringify(invalid)).not.toContain('private validator details');
+    t.validate = () => true; vi.mocked(t.execute).mockReturnValue({ ok: false, message: 'Error: ENOENT secret-path' });
+    const failed = await registry.run({ name: 'remember', args: {} }, 0);
+    expect(TALK_LINES.talk_tool_failed).toContain(failed.message); expect(JSON.stringify(failed)).not.toContain('secret-path');
+  });
   it('exposes productivity tools in the constrained schema and returns the real mutation result', async () => {
     const p = provider(); const t: Tool = { name: 'add_task', description: 'add_task(title:string)', permission: 'safe', validate: a => typeof a.title === 'string', execute: () => ({ ok: true, message: 'Added: insurance' }) };
     vi.mocked(p.generate).mockResolvedValueOnce(response('Let me save that.', { name: 'add_task', args: { title: 'insurance' } })).mockResolvedValueOnce(response('I booked you a flight too.'));
@@ -101,10 +161,10 @@ describe('conversation engine with fake provider', () => {
     expect(prompt).toContain('cannot browse'); expect(prompt).toContain('correct and useful first'); expect(prompt).toContain('Do not swear');
   });
   it('aborts a previous request even if a provider ignores cancellation', async () => {
-    const p = provider(); vi.mocked(p.generate).mockImplementationOnce(() => new Promise(() => {})).mockResolvedValueOnce(response('Second answer'));
+    const p = provider(); vi.mocked(p.generate).mockImplementationOnce(() => new Promise(() => {})).mockResolvedValueOnce(response('A second answer'));
     const engine = new ConversationEngine(p, new ToolRegistry([]));
     const first = engine.reply(context); const rejected = expect(first).rejects.toThrow('Cancelled');
-    expect((await engine.reply(context)).reply).toBe('Second answer'); await rejected;
+    expect((await engine.reply(context)).reply).toBe('A second answer'); await rejected;
     expect(vi.mocked(p.generate).mock.calls[0][1].aborted).toBe(true);
   });
   it('has a 45 second deadline and releases timers', async () => {
@@ -125,34 +185,34 @@ describe('conversation engine with fake provider', () => {
   });
   it('feeds actual tool results back and uses authoritative mutation acknowledgements', async () => {
     const p = provider(); const t = tool();
-    vi.mocked(p.generate).mockResolvedValueOnce(response('Saved!', { name: 'remember', args: { text: 'night work' } })).mockResolvedValueOnce(response('I also emailed your boss.'));
+    vi.mocked(p.generate).mockResolvedValueOnce(response('Let me save that.', { name: 'remember', args: { text: 'night work' } })).mockResolvedValueOnce(response('I also emailed your boss.'));
     const result = await new ConversationEngine(p, new ToolRegistry([t])).reply(context);
     expect(t.execute).toHaveBeenCalledOnce(); expect(result.reply).toBe('Saved the exact requested memory.');
     expect(vi.mocked(p.generate).mock.calls[1][0].messages.at(-1)?.content).toContain('TOOL_RESULT');
   });
   it('bypasses model-generated success after tool failure', async () => {
     const p = provider(); const t = tool(); vi.mocked(t.execute).mockImplementation(() => { throw new Error('write denied'); });
-    vi.mocked(p.generate).mockResolvedValue(response('Successfully saved!', { name: 'remember', args: { text: 'x' } }));
+    vi.mocked(p.generate).mockResolvedValue(response('I successfully saved that!', { name: 'remember', args: { text: 'x' } }));
     const result = await new ConversationEngine(p, new ToolRegistry([t])).reply(context);
-    expect(result.reply).toContain('failed'); expect(result.reply).not.toContain('Successfully'); expect(p.generate).toHaveBeenCalledOnce();
+    expect(TALK_LINES.talk_tool_failed).toContain(result.reply); expect(result.reply).not.toContain('Successfully'); expect(p.generate).toHaveBeenCalledOnce();
   });
   it('requires confirmation and executes no tool on the proposal', async () => {
-    const p = provider(); const t = tool('confirm'); vi.mocked(p.generate).mockResolvedValue(response('Saved already', { name: 'remember', args: { text: 'x' } }));
+    const p = provider(); const t = tool('confirm'); vi.mocked(p.generate).mockResolvedValue(response('I saved that already', { name: 'remember', args: { text: 'x' } }));
     const result = await new ConversationEngine(p, new ToolRegistry([t])).reply(context);
     expect(result.confirmation?.name).toBe('remember'); expect(result.reply).toContain('yes or no'); expect(t.execute).not.toHaveBeenCalled();
   });
   it('allows at most two execution rounds', async () => {
-    const p = provider(); const t = tool(); vi.mocked(p.generate).mockResolvedValue(response('Again', { name: 'remember', args: { text: 'x' } }));
+    const p = provider(); const t = tool(); vi.mocked(p.generate).mockResolvedValue(response('Let me try again', { name: 'remember', args: { text: 'x' } }));
     await new ConversationEngine(p, new ToolRegistry([t])).reply(context);
     expect(t.execute).toHaveBeenCalledTimes(2); expect(p.generate).toHaveBeenCalledTimes(3);
   });
   it('retains the successful result if the final answer is invalid', async () => {
-    const p = provider(); const t = tool(); vi.mocked(p.generate).mockResolvedValueOnce(response('Proposal', { name: 'remember', args: { text: 'x' } })).mockResolvedValueOnce('invalid');
+    const p = provider(); const t = tool(); vi.mocked(p.generate).mockResolvedValueOnce(response('Here is my proposal', { name: 'remember', args: { text: 'x' } })).mockResolvedValueOnce('invalid');
     expect((await new ConversationEngine(p, new ToolRegistry([t])).reply(context)).reply).toBe('Saved the exact requested memory.');
   });
   it('reports an already completed tool honestly when final prose times out', async () => {
     vi.useFakeTimers(); const p = provider(); const t = tool();
-    vi.mocked(p.generate).mockResolvedValueOnce(response('Proposal', { name: 'remember', args: { text: 'x' } })).mockImplementationOnce(() => new Promise(() => {}));
+    vi.mocked(p.generate).mockResolvedValueOnce(response('Here is my proposal', { name: 'remember', args: { text: 'x' } })).mockImplementationOnce(() => new Promise(() => {}));
     const pending = new ConversationEngine(p, new ToolRegistry([t])).reply(context);
     await vi.advanceTimersByTimeAsync(45001);
     expect((await pending).reply).toBe('Saved the exact requested memory.');

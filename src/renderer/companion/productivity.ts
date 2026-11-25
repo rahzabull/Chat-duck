@@ -1,6 +1,8 @@
 import type { CompanionState } from '../../shared/types';
 import { localDate, type ProductivityView, type Reminder, type Task } from '../../core/productivity/types';
 import { reminderLabel } from '../../core/productivity/presentation';
+import { closeButton } from '../shared/close';
+import { PRODUCTIVITY_LINES } from '../../core/productivity/lines';
 export { reminderLabel } from '../../core/productivity/presentation';
 
 /** All data enters textContent/value. No HTML interpretation of user or model text. */
@@ -50,7 +52,7 @@ export class ProductivityUI {
       const l = view.layout;
       Object.assign(this.host.style, { inset: 'auto', left: `${l.x}px`, top: `${l.y}px`, width: `${l.width}px`, height: `${l.height}px` });
       Object.assign(this.card.style, { left: `${l.contentX}px`, bottom: `${l.contentBottom}px`, width: `${l.contentWidth}px`, maxHeight: `${Math.min(420, l.contentHeight)}px` });
-      Object.assign(this.badge.style, { left: `${l.contentX}px`, bottom: `${l.contentBottom - 38}px`, maxWidth: `${l.contentWidth}px` });
+      Object.assign(this.badge.style, { left: `${l.contentX}px`, bottom: `${l.contentBottom - 44}px`, maxWidth: `${l.contentWidth}px` });
     }
     this.card.hidden = !view.card; this.badge.hidden = !view.focus && !view.breakMinutes;
     document.body.classList.toggle('productivity-open', !!view.card);
@@ -65,8 +67,9 @@ export class ProductivityUI {
     const v = this.view!;
     const focused = document.activeElement instanceof HTMLInputElement ? document.activeElement : undefined;
     const focusLabel = focused?.getAttribute('aria-label'); const caret = focused?.selectionStart;
-    this.card.replaceChildren(); const heading = element('header');
-    heading.append(element('strong', v.card?.includes('reminder') ? 'Reminders' : v.card === 'notes' ? 'Notes' : 'Tasks'), button('Close', () => { void this.run('close'); })); this.card.append(heading, this.toast);
+    this.card.replaceChildren(); const heading = element('header'); this.toast.className = 'ducky-quip';
+    if (v.card === 'reminder-due' && this.toast.hidden) { this.toast.textContent = PRODUCTIVITY_LINES.reminder_due[0]; this.toast.hidden = false; }
+    heading.append(element('strong', v.card?.includes('reminder') ? 'Reminders' : v.card === 'notes' ? 'Notes' : 'Tasks'), closeButton(() => { void this.run('close'); })); this.card.append(heading, this.toast);
     if (v.card === 'tasks') this.tasks();
     if (v.card === 'task-created') {
       const task = v.tasks.find(t => t.id === v.selected); if (task) { this.card.append(element('p', `Added: ${task.title}`), element('p', task.due ? `Due ${task.due}${task.dueTime ? ` at ${task.dueTime}` : ''}` : 'No due date')); }
@@ -80,7 +83,7 @@ export class ProductivityUI {
     }
     if (v.card === 'reminder-created' || v.card === 'reminder-due') {
       const r = v.reminders.find(r => r.id === v.selected);
-      if (r) { this.card.append(element('p', r.text), element('p', reminderLabel(r))); if (v.card === 'reminder-due') {
+      if (r) { this.card.append(element('strong', r.text), element('p', reminderLabel(r))); if (v.card === 'reminder-due') {
         if (v.message.startsWith('You missed')) this.card.append(element('p', v.message));
         if (v.queue) this.card.append(element('small', `+${v.queue} more`));
       } this.reminderControls(this.card, r); }
@@ -108,11 +111,11 @@ export class ProductivityUI {
       for (const task of undated) this.taskRow(task);
     } else for (const task of tasks) this.taskRow(task);
     if (!tasks.length) this.card.append(element('p', 'Nothing here. A rare moment of peace.'));
-    this.form(this.card, '+ Add task', text => this.run('text', { text: `add ${text}` }));
+    this.form(this.card, '+ Add a task, or just tell me', text => this.run('text', { text: `add ${text}` }));
     if (this.tab === 'done') this.card.append(button('Clear completed', () => { void this.run('clear_completed'); }));
   }
   private taskRow(task: Task): void {
-    const row = element('article'); const line = element('div'); const done = element('input'); done.type = 'checkbox'; done.checked = task.done; done.setAttribute('aria-label', `Complete ${task.title}`);
+    const row = element('article'); row.className = task.done ? 'task-row done' : 'task-row'; const line = element('div'); const done = element('input'); done.type = 'checkbox'; done.checked = task.done; done.setAttribute('aria-label', `Complete ${task.title}`);
     done.onchange = () => { void this.run('update_task', { id: task.id, done: done.checked }); };
     const title = field(`Title: ${task.title}`, task.title); title.onchange = () => { void this.run('update_task', { id: task.id, title: title.value }); };
     line.append(done, title); line.className = 'task-title'; row.append(line);
@@ -130,7 +133,12 @@ export class ProductivityUI {
   }
   private reminderControls(parent: HTMLElement, reminder: Reminder): void {
     const id = reminder.id;
-    parent.append(button('Done', () => { void this.run('done_reminder', { id }); }));
+    const done = button('Done', () => { void this.run('done_reminder', { id }); }); done.className = 'primary'; parent.append(done);
+    if (this.view?.card === 'reminder-due') {
+      parent.append(button('Snooze 10 min', () => { void this.run('snooze_reminder', { id, minutes: 10 }); }));
+      if (reminder.recurrence) parent.append(button('Stop series', () => { void this.run('cancel_reminder', { id }); }));
+      return;
+    }
     const snooze = element('select'); snooze.setAttribute('aria-label', 'Snooze duration');
     for (const n of [5, 10, 30, 60]) { const o = element('option', `${n} min`); o.value = String(n); snooze.append(o); } snooze.value = String(this.view!.settings.defaultSnooze);
     const custom = element('option', 'Custom'); custom.value = 'custom'; snooze.append(custom); if (!snooze.value) snooze.value = 'custom';
@@ -153,16 +161,16 @@ export class ProductivityUI {
     }
     const search = field('Search notes', this.search); search.oninput = () => { this.search = search.value; this.renderCard(); }; this.card.append(search);
     const notes = [...this.view!.notes].sort((a, b) => Number(b.pinned) - Number(a.pinned)).filter(n => `${n.title ?? ''} ${n.text} ${n.topic ?? ''}`.toLowerCase().includes(this.search.toLowerCase()));
-    for (const n of notes) this.card.append(button(`${n.pinned ? '★ ' : ''}${n.title || n.text.slice(0, 100)}`, () => { this.note = n.id; this.renderCard(); }));
+    for (const n of notes) { const item = button(`${n.pinned ? '★ ' : ''}${n.title || n.text.slice(0, 100)}`, () => { this.note = n.id; this.renderCard(); }); item.className = 'note-item'; this.card.append(item); }
     if (!notes.length) this.card.append(element('p', 'No notes here yet.'));
     this.form(this.card, 'New note', text => this.run('add_note', { text }), true);
   }
   private renderFocus(): void {
     clearInterval(this.countdown); this.countdown = undefined; this.badge.replaceChildren(); const focus = this.view?.focus;
-    if (!focus) { if (this.view?.breakMinutes) this.badge.append(button(`Start ${this.view.breakMinutes} min break`, () => { void this.run('start_focus', { minutes: this.view!.breakMinutes, kind: 'break' }); }), button('Skip', () => { void this.run('skip_break'); })); return; }
+    if (!focus) { if (this.view?.breakMinutes) this.badge.append(button(`Start ${this.view.breakMinutes} min break`, () => { void this.run('start_focus', { minutes: this.view!.breakMinutes, kind: 'break' }); }), closeButton(() => { void this.run('skip_break'); })); return; }
     const update = () => { const seconds = Math.max(0, Math.ceil((focus.paused ? focus.remaining : focus.endAt - Date.now()) / 1000)); this.clock.textContent = `${focus.kind === 'break' ? 'Break' : 'Focus'} ${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`; };
     update(); if (!focus.paused) this.countdown = setInterval(update, 1000);
-    this.badge.append(this.clock, button(focus.paused ? 'Resume' : 'Pause', () => { void this.run(focus.paused ? 'resume_focus' : 'pause_focus'); }), button('Stop', () => { void this.run('stop_focus'); }));
+    this.badge.append(this.clock, button(focus.paused ? 'Resume' : 'Pause', () => { void this.run(focus.paused ? 'resume_focus' : 'pause_focus'); }), closeButton(() => { void this.run('stop_focus'); }));
   }
   dispose(): void { clearInterval(this.countdown); clearTimeout(this.undoTimer); }
 }
