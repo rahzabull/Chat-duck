@@ -1,3 +1,6 @@
+import { PRESETS } from './presets';
+import { sanitizeName } from '../memory';
+import type { Mood } from '../emotions';
 import type { AnimationId, EmotionId } from '../../animation/adapter';
 import type { Settings } from '../../shared/types';
 import type { Priority } from '../interruptions';
@@ -5,6 +8,8 @@ import { LINES, type Line, type Situation } from './lines';
 export type { Situation } from './lines';
 
 export interface DialogueContext {
+  personality?: Settings['personality']; profanity?: boolean; speechScale?: number;
+  mood?: Mood; emotions?: string[]; memoryEnabled?: boolean; name?: string; memoryFact?: string;
   talkativeness?: Settings['talkativeness']; app?: string; minutes?: number; hours?: number;
   count?: number; awayMs?: number; fullscreen?: boolean;
 }
@@ -12,6 +17,16 @@ export interface DirectedSpeech { text: string; then?: string; priority: Priorit
 type Policy = readonly [chance: number, cooldownSeconds: number, priority: Priority, emotion: EmotionId, animation: AnimationId];
 /** All speech probabilities and per-situation cooldowns live here. */
 export const POLICIES: Record<Situation, Policy> = {
+  activity_yawn: [.2, 600, 'low', 'sleepy', 'yawn'],
+  activity_stretch: [.2, 600, 'low', 'neutral', 'stretch'],
+  activity_dance: [.35, 600, 'low', 'happy', 'dance'],
+  event_strike: [1, 3600, 'low', 'suspicious', 'strike'],
+  event_sunglasses: [1, 3600, 'low', 'neutral', 'sunglasses'],
+  event_bread: [.7, 1800, 'low', 'happy', 'bread_snack'],
+  event_visitor: [1, 43200, 'low', 'curious', 'visitor'],
+  memory_pickups: [.15, 86400, 'low', 'suspicious', 'idle'],
+  memory_anniversary: [1, 86400, 'low', 'happy', 'idle'],
+  memory_name: [.2, 3600, 'medium', 'happy', 'idle'],
   first_launch: [1, 0, 'high', 'curious', 'idle'],
   hover: [.15, 45, 'low', 'curious', 'idle'],
   hover_linger: [.7, 60, 'medium', 'suspicious', 'look_left'],
@@ -75,14 +90,17 @@ export function timeAway(ms: number): string {
 export function fillTemplate(text: string, context: DialogueContext, now: number): string {
   const slots: Record<string, string> = {
     app: context.app ?? 'that app', minutes: String(context.minutes ?? 0), hours: String(context.hours ?? Math.floor((context.minutes ?? 0) / 60)),
-    count: String(context.count ?? 1), timeAway: timeAway(context.awayMs ?? 0),
+    name: sanitizeName(context.name ?? 'friend'), count: String(context.count ?? 1), timeAway: timeAway(context.awayMs ?? 0),
     time: new Date(now).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
   };
   return text.replace(/\{(\w+)\}/g, (slot, key: string) => slots[key] ?? slot);
 }
 
+export function eligibleLine(line: Line): boolean {
+  return !/Talking to another AI\?|I missed you|can't stay away|wrong with you|what the hell are you doing/i.test(line.text + ' ' + (line.then ?? ''));
+}
 export class DialogueDirector {
-  private bags = new Map<Situation, Line[]>();
+  private bags = new Map<string, Line[]>();
   // Store authored templates only: never historical foreground app names.
   private recent: Line[] = [];
   private cooldowns = new Map<Situation, number>();
@@ -97,22 +115,29 @@ export class DialogueDirector {
     if (now < (this.cooldowns.get(situation) ?? 0) || (appComment && now < (this.appAllowed.get(appGroup) ?? 0))) return null;
     const scale = context.talkativeness === 'quiet' ? .5 : context.talkativeness === 'chatty' ? 1.5 : 1;
     // Strong physical reactions remain dependable even for a quiet duck.
-    if (this.rng() >= Math.min(1, chance >= .9 ? chance : chance * scale)) return null;
-    let bag = this.bags.get(situation);
-    if (!bag?.length) {
-      // Keep the voice file intact; omit its one self-identification as an AI.
-      const pool = LINES[situation].filter(line => !line.text.includes('Talking to another AI?'));
-      // Weighted shuffle without replacement (exponential race).
-      bag = pool.map(line => ({ line, key: -Math.log(Math.max(Number.EPSILON, this.rng())) / (line.weight ?? 1) }))
-        .sort((a, b) => a.key - b.key).map(entry => entry.line);
-      this.bags.set(situation, bag);
-    }
+    if (this.rng() >= Math.min(1, (chance >= .9 ? chance : chance * scale) * (priority === 'high' ? 1 : context.speechScale ?? 1))) return null;
+    const preset = PRESETS[context.personality ?? 'sarcastic'];
+    const overlays = preset.lines[situation]?.filter(eligibleLine);
+    const profane = context.profanity ? preset.profane?.[situation]?.filter(eligibleLine) : undefined;
+    const kind = profane?.length && this.rng() < .3 ? 'profane' : overlays?.length && this.rng() < .75 ? 'preset' : 'base';
     const recentTexts = this.recent.flatMap(line => [line.text, line.then].filter(Boolean));
-    const index = bag.findIndex(line => !recentTexts.includes(line.text) && (!line.then || !recentTexts.includes(line.then)));
-    // Small pools go quiet until other dialogue frees their last twelve selections.
+    let bag: Line[] = [], index = -1;
+    for (const candidate of kind === 'base' ? ['base'] : [kind, 'base']) {
+      const key = [situation, preset.id, candidate].join(':');
+      bag = this.bags.get(key) ?? [];
+      if (!bag.length) {
+        const pool = (candidate === 'profane' ? profane! : candidate === 'preset' ? overlays! : LINES[situation]).filter(eligibleLine);
+        bag = pool.map(line => ({ line, key: -Math.log(Math.max(Number.EPSILON, this.rng())) / (line.weight ?? 1) }))
+          .sort((a, b) => a.key - b.key).map(entry => entry.line);
+        this.bags.set(key, bag);
+      }
+      index = bag.findIndex(line => !recentTexts.includes(line.text) && (!line.then || !recentTexts.includes(line.then)));
+      if (index >= 0) break;
+    }
+    // Exhausted pools stay silent rather than repeating a recent beat.
     if (index < 0) return null;
     const line = bag[index];
-    const speech: DirectedSpeech = { text: fillTemplate(line.text, context, now), then: line.then ? fillTemplate(line.then, context, now) : undefined, priority, emotion,
+    const speech: DirectedSpeech = { text: fillTemplate(line.text, context, now), then: line.then ? fillTemplate(line.then, context, now) : undefined, priority, emotion: context.mood === 'grumpy' && emotion === 'neutral' ? 'suspicious' : emotion,
       animation: situation === 'thought' ? (['idle', 'look_left', 'look_right'] as const)[Math.floor(this.rng() * 3)] : animation };
     if (!accept(speech)) return null;
     bag.splice(index, 1); this.recent = [...this.recent, line].slice(-12);

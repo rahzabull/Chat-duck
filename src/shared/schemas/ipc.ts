@@ -3,7 +3,7 @@ import { ANIMATION_IDS } from '../../animation/adapter';
 import { isPoint, isSettingsPatch } from './settings';
 
 const empty = new Set<string>([
-  CHANNELS.testAI,
+  CHANNELS.testAI, CHANNELS.forgetMemory,
   CHANNELS.getState, CHANNELS.dragEnd, CHANNELS.doubleClick, CHANNELS.contextMenu, CHANNELS.dismissBubble,
 ]);
 export function validatePayload(channel: string, value: unknown): boolean {

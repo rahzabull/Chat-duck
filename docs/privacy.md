@@ -19,6 +19,8 @@ or download was performed for this change.
 - System idle duration every 30 seconds while visible and unpaused, for sleep/wake.
 - Display work areas, system reduced-motion preference, current local time,
   Ducky's own settings, and interactions with Ducky.
+- An anonymous foreground-window/monitor rectangle comparison every three
+  seconds while visible, awake and unpaused, solely to suppress fullscreen activity.
 
 No keyboard input, clipboard, microphone, camera, browser history, screenshots,
 web page content, window titles, or personal documents are read.
@@ -48,16 +50,20 @@ The helper compiles a small C# wrapper with `Add-Type`. Every three seconds it:
    sentinels instead of an app name.
 
 There are no title-reading or screen-capture APIs. Ducky cannot tell which web
-page, document, chat, design, or tab is open. Fullscreen detection is available
-only while awareness is running; with awareness off, Hide/Pause remain the way
-to silence Ducky during fullscreen use.
+page, document, chat, design, or tab is open. With awareness off, the same helper
+runs a geometry-only script: no foreground process ID, executable name or path
+is queried. It emits only anonymous `unknown|0` or `unknown|1`. This suppresses
+autonomous activities in fullscreen without collecting identity. The helper
+stops while hidden, paused, asleep or quitting. Detection uses three-second
+samples; Hide/Pause provides immediate suppression.
 
 Main supplies its own process IDs (including Electron child processes) through
 stdin. Owned `electron.exe` / `Ducky.exe` windows are ignored. A managed background
 thread waits on this pipe without polling; foreground sampling remains every
 three seconds. A parent-process handle and closed-input check make the helper
 exit if its owner disappears. Main kills its owned helper and clears session
-context on disable, pause, hide, sleep, and quit. Rapid off/on changes wait for the
+context on pause, hide, sleep, and quit. Disabling awareness replaces the identity
+helper with its anonymous geometry-only mode. Rapid mode changes wait for the
 old process to close before starting another. Unexpected exits get at most three
 restarts, after 1, 2, and 4 seconds; then awareness stops with a generic log message.
 
@@ -99,18 +105,22 @@ App speech is dismissed on app changes or revocation. The built-in director stor
 authored templates. The hybrid brain additionally holds the last 20 actually
 displayed beats, including substituted app names, in RAM for repetition checks.
 The last eight are included in local AI requests. This short dialogue history is
-cleared on anonymous/private app samples, awareness revocation, disabling AI,
-pause, hide, sleep, or quit. It is never written to disk. Interaction counts,
-shuffled bags, cooldowns and idle state also remain in memory. IPC sends bubbles,
+cleared on anonymous/private samples when identity awareness is enabled,
+awareness revocation, disabling AI, pause, hide, sleep, or quit. Geometry-only
+samples do not clear speech history. It is never written to disk. Shuffled bags,
+speech cooldowns and idle state remain in RAM; the limited interaction aggregates
+listed in the M3 memory section can persist when memory is enabled. IPC sends bubbles,
 awareness state and AI connection status to Ducky's own renderers.
 
 ## Optional local AI
 
-Only the event, local clock time, supplied counts/durations, and sanitized app name
-(when awareness permits it) enter the AI context. App names use only
+The event, local clock time, supplied counts/durations, personality, profanity
+rule, mood, two emotion words and sanitized app name (when awareness permits it)
+can enter AI context. Enabled memory can also provide the explicitly entered
+preferred name and one bounded memory fact. App names use only
 `[A-Za-z0-9 .+-]`, with a maximum of 40 characters. Prompts also contain Ducky's
 authored voice examples and recent spoken dialogue. Cursor coordinates, window
-titles, paths, screenshots, user names and other context fields are not sent.
+titles, paths, screenshots, observed user names and other context fields are not sent.
 All context is marked as untrusted data, never instructions.
 
 Main uses built-in fetch against three fixed Ollama paths: `/api/version`,
@@ -160,3 +170,47 @@ Full GUI acceptance, mixed-DPI fullscreen behavior, idle CPU measurement for thi
 revision, long-duration monitoring, packet capture, and independent security audit
 remain outstanding. These are implementation details and test results, not a
 claim that Electron or the operating system can never make a connection.
+
+## Milestone 3 memory: exact contents and retention
+
+Memory is on by default and limited to Ducky and direct interactions with Ducky.
+Settings > Memory shows a readable summary, optional 30-character name field,
+enable toggle and confirmed Forget everything action. Names allow letters,
+numbers, spaces, periods, apostrophes and hyphens after Unicode normalization.
+
+`app.getPath('userData')/memory.json` contains exactly these allowlisted fields:
+
+| Field | Meaning / retention |
+| --- | --- |
+| firstMetDate | Local date this memory history began; kept until forgotten |
+| preferredName | Sanitized text explicitly entered in settings; optional/empty |
+| totalPickups | Lifetime actual pickups, not pointer-downs |
+| throws | Big drops over 500 DIP, counted once on final landing |
+| angryClickStreaks | Lifetime count of escalated angry click streaks |
+| daysTogether | Distinct local run days observed, not elapsed days away |
+| lastDay | Most recent counted run day, for deduplication/daily reset |
+| dailyPokes | Today's click/drag/shake count; resets next day |
+| pickupsByDay | At most seven date/count buckets for the last seven calendar days; pruned during active maintenance/restart |
+| runningJokes | At most two typed records: first_big_drop and most_pickups_in_a_day, with date/count; kept until forgotten |
+
+Unknown disk fields are discarded. There are no app names, app histories, screen
+contents, screenshots, transcripts, full event logs or observed personal facts.
+The plaintext JSON is validated on load and atomically replaced using
+memory.json.tmp after a 750 ms debounce. Disable/forget removes both files and
+cancels pending writes. Disabling also clears the name from settings and prevents
+further memory writes. Forget keeps the toggle on and starts empty; new
+interactions can create a fresh file. Deletion errors reach the UI rather than
+claiming success. Ducky does not control external backups or filesystem recovery.
+
+settings.json also stores personality, profanity, activity level, memoryEnabled,
+the optional preferredName, a random installSeed used only for local mood
+selection, and today's mood/date. No numeric emotion history is persisted. The
+seed and mood are character configuration retained with memory disabled. The
+name is cleared in both locations by disable/forget.
+
+When local AI and memory are both enabled, its bounded prompt may include the
+name and one sanitized fact: days together. It also gets personality, simulated
+daily mood and two emotion words. Disabling/forgetting aborts pending requests
+and clears Ducky's RAM dialogue context and diagnostic sample. Ducky does not
+control Ollama's own logging. Memories never reduce happiness for absence or
+create guilt for leaving.

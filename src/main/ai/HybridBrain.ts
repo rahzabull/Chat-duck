@@ -10,7 +10,7 @@ export const usesAI = (situation: Situation): boolean => situation.startsWith('a
   'thought', 'thought_morning', 'thought_late', 'wake_long', 'hover_linger', 'hover_again', 'drag_long',
   'late_night_working', 'sleepy_late', 'click_forgive',
 ].includes(situation);
-type Config = Pick<Settings, 'aiEnabled' | 'aiModel' | 'ollamaPort'>;
+type Config = Pick<Settings, 'aiEnabled' | 'aiModel' | 'ollamaPort'> & Partial<Pick<Settings, 'personality' | 'profanity'>>;
 export const initialBrainState = (): BrainState => ({ phase: 'disabled', message: 'Built-in lines active', models: [] });
 
 const preferredModels = ['qwen3:8b', 'qwen3:4b', 'gemma3:4b'];
@@ -20,6 +20,7 @@ const retryDelays = [15000, 30000, 60000, 120000];
 export class HybridBrain {
   state = initialBrainState();
   private config: Config = { aiEnabled: false, aiModel: '', ollamaPort: 11434 };
+  private voice: DialogueContext = {};
   private provider?: AIProvider;
   private suspended = false;
   private epoch = 0;
@@ -52,6 +53,7 @@ export class HybridBrain {
   }
   configure(config: Config, suspended: boolean): void {
     if (this.disposed) return;
+    this.voice = { personality: config.personality, profanity: config.profanity };
     const different = config.aiEnabled !== this.config.aiEnabled || config.aiModel !== this.config.aiModel || config.ollamaPort !== this.config.ollamaPort;
     if (!different && suspended === this.suspended) return;
     this.stop(); this.retryAttempt = 0; this.config = { aiEnabled: config.aiEnabled, aiModel: config.aiModel, ollamaPort: config.ollamaPort }; this.suspended = suspended;
@@ -104,7 +106,7 @@ export class HybridBrain {
       ] }, new AbortController().signal);
       if (!valid()) return;
       if (test) {
-        const context = buildContext('thought', {});
+        const context = buildContext('thought', this.voice);
         const raw = await provider.generate(buildPrompt(this.config.aiModel, context, this.recent), new AbortController().signal);
         if (!valid()) return;
         const result = validateResponse(raw, context, this.recent);

@@ -1,4 +1,4 @@
-# Ducky architecture (Milestones 1–2)
+# Ducky architecture (Milestones 1–3)
 
 The main process owns all position, movement, behaviour and persistent state.
 The sandboxed renderer presents that state. Pure TypeScript core modules have no
@@ -13,13 +13,16 @@ Electron imports and are tested with synthetic clocks, RNGs and display layouts.
 | `src/main/platform` | Electron display work areas in DIP; cursor poller |
 | `src/main/companion/CompanionController.ts` | Authoritative body, active timers, interaction interpretation, event reactions, `setBounds`, speech presentation |
 | `src/main/settings` | Validated JSON load, 750 ms debounce, synchronous temp-write/rename, final flush |
+| `src/main/memory` | Validated bounded interaction memory, atomic debounce, disable/forget deletion |
 | `src/main/ipc` | Named channel allowlist, sender/frame/page checks, strict payload validation, role restrictions |
 | `src/main/tray` | Hand-drawn 32 px bitmap converted to PNG, dynamic native menus |
 | `src/preload/index.ts` | Typed `window.ducky`, explicit methods and removable subscriptions; no raw IPC or Node exposure |
 | `src/renderer/companion` | Adapter host, shape-based hit decisions, pointer capture, bubble presentation |
 | `src/renderer/settings` | React controls and live settings; normal focused window |
 | `src/core/physics` | Gravity, friction, bounded throws, two-bounce cap, safe display selection, walking and recovery |
-| `src/core/behaviour` | Weighted idle/look/sit/walk decisions with injectable clock and RNG |
+| `src/core/behaviour` | Mood/emotion-weighted activities, rare-event cooldowns, injectable clock and RNG |
+| `src/core/emotions` | Seven numeric emotions, local daily mood, decay, daily patience and idle face |
+| `src/core/memory` | Fixed interaction-only schema, sanitized names, rolling pickup aggregates and running jokes |
 | `src/core/events` | Typed bus for all section-28 event names |
 | `src/core/interruptions` | One visible speech slot, priority/cooldown/mute/block rules, no backlog |
 | `src/core/dialogue` | Situation policies, weighted authored pools, last-twelve template exclusion, interaction context |
@@ -180,7 +183,7 @@ Inline styles are allowed for SVG/CSS adapter properties and React styles.
 | Milestone | Attachment point; not implemented in M1 |
 | --- | --- |
 | M2: brain | Implemented above; real-model quality and desktop responsiveness pending Claude |
-| M3: personality | Add pure emotion/personality state and memory interfaces; extend scheduler weights and dialogue selection through the bus |
+| M3: personality | Implemented below; desktop voice, animation and CPU verification pending Claude |
 | M4: awareness | Add separately permission-gated collectors under `src/awareness`; emit typed events without changing physics/renderers |
 | M5: productivity | Add `src/main/database` SQLite repository and `src/main/scheduler` durable reminder service; task/reminder/focus events feed existing interruption rules |
 | M6: vision | Add separately authorized selected-window capture under `src/awareness/vision`, transient data and validated AI context; no current capture permission or pipeline |
@@ -190,3 +193,73 @@ Inline styles are allowed for SVG/CSS adapter properties and React styles.
 Future productivity timers must have their own lifetime: hiding the companion
 must not implicitly stop reminders. There is no task database or reminder
 scheduler. Opt-in awareness and local AI are implemented.
+
+## Milestone 3 personality and memory flow
+
+Main remains authoritative. Core has no Electron, filesystem, network or renderer
+dependencies. Emotions and behaviour take clocks/RNGs; daily mood is a pure
+date/install-seed/preset calculation. The authored presets file is unchanged.
+A selection filter excludes guilt/directed-swearing beats and the existing AI
+self-identification. Safe preset overlays win about 75% of fresh selections;
+enabled profane overlays about 30%. Weighted bags are keyed by situation, preset
+and pool, with one shared last-twelve template history. Exhausted small overlays
+try the base pool before choosing silence.
+
+Settings add personality (sarcastic), profanity (false), activityLevel (normal),
+memoryEnabled (true), preferredName (sanitized, 30 characters), an internal random
+installSeed, and dailyMood containing only date/mood. IPC cannot edit seed/mood.
+Same-day preset changes do not reroll the mood.
+
+`core/emotions` owns seven bounded values and mood baselines. Main ticks it every
+30 seconds while visible/unpaused; sleeping freezes emotion changes. Resume
+resets the elapsed-time anchor, preventing hidden/paused catch-up. Decay has a
+ten-minute half-life. Boredom has a mild target capped at 55 and cannot reduce
+happiness or raise irritation. Returns add happiness, never debt. Daily physical
+interaction tolerance resets by local date; hover never raises it. Numeric
+emotions stay in RAM. Main emits MOOD_CHANGED on startup/date rollover and sends
+the resulting face through `adapter.setEmotion`.
+
+`core/behaviour` weights ordinary activities by emotions and mood, with calm,
+normal and lively intervals. Rare events have independent cooldowns. Visitors
+average about one per active 24-hour day at normal level, not a guaranteed daily
+visit; chaotic mood raises rare-event chances. Main holds finite activities with
+one timeout. Sunglasses are a separate static accessory for about two minutes,
+surviving ordinary pose changes. Physics still owns walking and positions.
+
+Activities stop for pause/hide, drag, sleep, fullscreen or helper loss. Autonomous
+behaviour waits for a known geometry sample. With app awareness off, the existing
+helper runs in geometry-only mode: the generated script removes foreground
+process identity queries and returns only an anonymous fullscreen bit. Fullscreen
+entry cancels activities and autonomous walking. Its three-second sampling delay
+means detection is not instantaneous. Helper failure suppresses autonomous work
+until recovery; direct interactions remain available. There is no second helper.
+
+`core/memory` validates a fixed schema and updates only direct Ducky interaction
+aggregates. `main/memory/store.ts` owns memory.json, 750 ms debouncing, temporary
+write/rename, dirty flush on quit, disable/forget deletion, and propagation of
+deletion failures. Unchanged memory is not written every tick. A rolling seven-day
+pickup histogram is pruned during active maintenance/restart. Settings receives
+readable summaries. Forgetting clears the name in settings, RAM counters, pending
+AI requests, recent AI context and diagnostic samples.
+
+Memory greetings, pickup receipts and 7/30/100 run-day milestones use authored
+templates and the usual speech gates. Anniversaries are attempted once per
+accepted day in a session; restarting can attempt again because speech history
+is not persisted. Disabling memory prevents memory dialogue/context and writes;
+enabling starts fresh. Only the user's explicit name and one bounded fact (days
+together) can enter AI memory context.
+
+AI prompts include selected style, preset examples, profanity rule, mood and two
+emotion words. Exact mild words are exempt only when enabled; strong language,
+slurs and directed swearing remain rejected. Models cannot start rare events or
+naps. Voice/privacy changes invalidate pending responses. Diagnostic samples use
+the selected voice too.
+
+Renderer work remains behind CharacterSurface. New activity CSS has finite
+iteration counts; nap, sitting, signs and glasses are static. No new continuous
+idle frame loop was added. Four-pose breathing and background throttling remain.
+Native CPU/memory costs, including geometry-only mode, await Claude's measurement.
+
+Development-only `electron . --debug-activity <id>` waits for a safe geometry
+sample, then forces one allowlisted activity. Packaged builds ignore the flag;
+there is no debug IPC endpoint. See animation-contract.md for IDs and durations.

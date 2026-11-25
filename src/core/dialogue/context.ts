@@ -24,23 +24,24 @@ export class InteractionContext {
     this.hovers = [...this.hovers.filter(time => now - time < 60000), now];
     return { situation: this.hovers.length >= 3 ? 'hover_again' : 'hover', context: { count: this.hovers.length } };
   }
-  click(): SituationEvent | null {
+  click(patience = 0): SituationEvent | null {
     const now = this.clock(); this.clicks = this.clicks.filter(time => now - time < 4000);
     if (!this.clicks.length) this.angry = false;
     this.clicks.push(now);
     if (this.forgiveAt !== undefined) this.forgiveAt = now + 20000;
     const count = this.clicks.length;
-    if (count >= 5) {
+    const threshold = patience >= 10 ? 3 : 5;
+    if (count >= threshold) {
       if (this.angry) return null;
       this.angry = true; this.forgiveAt = now + 20000;
     }
-    return { situation: count >= 5 ? 'click_angry' : count >= 2 ? 'click_escalate' : 'click', context: { count } };
+    return { situation: count >= threshold ? 'click_angry' : count >= 2 ? 'click_escalate' : 'click', context: { count } };
   }
-  pickup(point: Point): SituationEvent {
+  pickup(point: Point, patience = 0): SituationEvent {
     const now = this.clock(); this.hover(false); this.dragStart = now; this.long = false; this.shaken = false;
     this.previous = { ...point, time: now }; this.direction = 0; this.reversals = [];
     this.pickups = [...this.pickups.filter(time => now - time < 120000), now];
-    return { situation: this.pickups.length >= 3 ? 'pickup_again' : 'pickup', context: { count: this.pickups.length } };
+    return { situation: this.pickups.length >= (patience >= 10 ? 2 : 3) ? 'pickup_again' : 'pickup', context: { count: this.pickups.length } };
   }
   drag(point: Point): SituationEvent | null {
     const now = this.clock(); const last = this.previous; this.previous = { ...point, time: now };

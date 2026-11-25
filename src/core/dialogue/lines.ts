@@ -20,6 +20,16 @@ export interface Line {
 }
 
 export type Situation =
+  | 'activity_yawn'
+  | 'activity_stretch'
+  | 'activity_dance'
+  | 'event_strike'
+  | 'event_sunglasses'
+  | 'event_bread'
+  | 'event_visitor'
+  | 'memory_pickups'
+  | 'memory_anniversary'
+  | 'memory_name'
   | 'first_launch'
   | 'hover' | 'hover_linger' | 'hover_again'
   | 'click' | 'click_escalate' | 'click_angry' | 'click_forgive'
@@ -300,4 +310,14 @@ export const LINES: Record<Situation, Line[]> = {
     { text: 'It\'s {time}. Even I have better work-life balance, and I\'m unemployed.' },
     { text: 'Still working at {time}? Go to bed. I\'ll keep the screen warm.' },
   ],
+  activity_yawn: [{"text":"That was a full-body yawn."},{"text":"Briefly swallowed the atmosphere."},{"text":"My beak needed a stretch."}],
+  activity_stretch: [{"text":"All two wings. Very thorough."},{"text":"Stretching. Technically exercise."},{"text":"There. Athletic career complete."}],
+  activity_dance: [{"text":"Nobody saw that."},{"text":"I've got moves. Two, specifically."},{"text":"The feet have their own agenda."}],
+  event_strike: [{"text":"I'm on strike. Demands mostly bread."},{"text":"Negotiations begin at lunch."},{"text":"This sign took my entire morning."}],
+  event_sunglasses: [{"text":"Incognito. You can't prove anything."},{"text":"The sun and I have an arrangement."},{"text":"Yes, indoors. I'm committed."}],
+  event_bread: [{"text":"A small business lunch."},{"text":"Finally. Something in my field."},{"text":"Crumbs are a food group."}],
+  event_visitor: [{"text":"Oh. Management's here."},{"text":"That's my very small colleague."},{"text":"We have the same accountant."}],
+  memory_pickups: [{"text":"That's {count} pickups this week. I'm keeping receipts."},{"text":"{count} lifts this week. Frequent flyer, apparently."},{"text":"{count} pickups. My commute is getting complicated."}],
+  memory_anniversary: [{"text":"{count} days together. Still no job."},{"text":"Day {count}. The hat remains professional."},{"text":"{count} days. Pretty good tenancy."}],
+  memory_name: [{"text":"Oh, hi, {name}."},{"text":"Morning, {name}. Depending on the morning."},{"text":"Hey, {name}. Hat's still here."}],
 };

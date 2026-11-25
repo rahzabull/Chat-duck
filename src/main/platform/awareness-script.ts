@@ -1,9 +1,9 @@
 import { PRIVATE_EXE_PATTERN } from '../../core/awareness';
 
 /** Only foreground process identity and window/monitor geometry. No title/content APIs. */
-export function awarenessScript(parentPid: number, ownPids: number[]): string {
+export function awarenessScript(parentPid: number, ownPids: number[], identity = true): string {
   if (![parentPid, ...ownPids].every(Number.isSafeInteger)) throw new Error('Invalid process id');
-  return `
+  let script = `
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 Add-Type -TypeDefinition @'
@@ -79,4 +79,11 @@ try {
   }
 } finally { [DuckyForeground]::Close($duckyParent) }
 `;
+  if (!identity) {
+    script = script.replace(/    IntPtr process = OpenProcess\(0x1000,[\s\S]*?    } finally { CloseHandle\(process\); }/, '    return "unknown" + suffix;');
+    script = script.replace(/  \[DllImport\("kernel32.dll", CharSet=CharSet.Unicode[^\n]+QueryFullProcessImageName[^\n]+\n/, '');
+    script = script.replace(/  \[DllImport\("user32.dll"\)\] static extern uint GetWindowThreadProcessId[^\n]+\n/, '');
+    script = script.replace('IntPtr hwnd = GetForegroundWindow(); uint pid;', 'IntPtr hwnd = GetForegroundWindow();').replace('    GetWindowThreadProcessId(hwnd, out pid);', '');
+  }
+  return script;
 }

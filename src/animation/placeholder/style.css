@@ -55,3 +55,28 @@
 @keyframes land { 25% { transform: scale(1.12,.86); } 65% { transform: scale(.97,1.03); } }
 @keyframes wake { 45% { transform: scale(.96,1.06); } }
 @keyframes talk { to { transform: translateY(5px); } }
+
+/* M3 activities are finite; held poses and accessories have no animation loop. */
+.duck .placard, .duck .sunglasses, .duck .bread, .duck .visitor { display: none; pointer-events: none; }
+.duck[data-emotion="sleepy"] .eyes { transform: scaleY(.45); }
+.duck[data-animation="strike"] .placard, .duck.wearing-sunglasses .sunglasses,
+.duck[data-animation="sunglasses"] .sunglasses, .duck[data-animation="bread_snack"] .bread { display: inline; }
+.duck:is([data-animation="nap"], [data-animation="yawn"]) .eyes { opacity: 0; }
+.duck:is([data-animation="nap"], [data-animation="yawn"]) .closed-eyes { opacity: 1; }
+.duck[data-animation="nap"] .body-motion { transform: scaleY(.92); }
+.duck[data-animation="nap"] .zzz { opacity: 1; }
+.duck[data-animation="yawn"] .beak-bottom { transform: translateY(8px) scaleY(1.3); transform-origin: 168px 224px; }
+.duck[data-animation="stretch"] .wing-left { transform: rotate(130deg); }
+.duck[data-animation="stretch"] .wing-right { transform: rotate(-130deg); }
+.duck[data-animation="stretch"] .body-motion { transform: scale(.97,1.04); }
+.duck[data-animation="dance"] .body-motion { animation: duck-dance .5s ease-in-out 4; }
+.duck[data-animation="side_eye"] .eyes { transform: scaleY(.7); }
+.duck[data-animation="side_eye"] .brows { opacity: 1; transform: rotate(-5deg); transform-origin: 160px 180px; }
+.duck[data-animation="look_around"] .head { animation: look-around 2.4s steps(1) 1; transform-origin: 159px 230px; }
+.duck[data-animation="bread_snack"] .bread { animation: nibble .7s steps(2) 5; }
+.duck[data-animation="visitor"] .visitor { display: inline; animation: visit 10s linear 1 both; }
+.duck.reduced[data-animation="visitor"] .visitor { transform: translateX(12px); }
+@keyframes duck-dance { 25% { transform: translateX(-5px) rotate(-5deg); } 75% { transform: translateX(5px) rotate(5deg); } }
+@keyframes look-around { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 65% { transform: translateX(5px); } }
+@keyframes nibble { 50% { transform: translate(-3px,-2px); } }
+@keyframes visit { 0%,100% { transform: translateX(-90px); opacity: 0; } 10% { opacity: 1; } 35%,65% { transform: translateX(12px); opacity: 1; } 90% { opacity: 1; } }

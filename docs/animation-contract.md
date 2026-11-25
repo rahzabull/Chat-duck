@@ -26,7 +26,7 @@ or replacing a reaction cancels its pending completion. Dispose clears timers,
 subscriptions and owned DOM.
 
 `CharacterSurface` additionally defines `hitTest(x,y)`, `setReducedMotion`,
-`setPaused`, `setTalking`, and `setDebugHitbox`. These preserve the boundary for
+`setPaused`, `setTalking`, `setSunglasses`, and `setDebugHitbox`. These preserve the boundary for
 hit shapes, accessibility, overlapping mouth animation and diagnostics. No code
 outside the placeholder adapter reads or changes SVG elements. The renderer
 constructs a surface and otherwise depends only on this contract.
@@ -51,7 +51,7 @@ constructs a surface and otherwise depends only on this contract.
 | `talking` | P0 | Beak opening; also an independent layer for the duration of a bubble |
 | `sitting` | Minimal P1 / M1 sit-ish idle | Lower, slightly compressed static body |
 
-These are all current animation IDs. Unknown animation/emotion IDs are ignored by
+The M3 table below extends these IDs. Unknown animation/emotion IDs are ignored by
 the adapter and rejected at the incoming animation-completion IPC boundary.
 Blinking and talking are independent layers; a talking duck can still walk or fall.
 Dragging/sleep flags communicate sustained states alongside `play`.
@@ -66,7 +66,7 @@ Current emotion IDs:
 | `startled` | Neutral open face with the startled body reaction |
 | `angry` | Inward tilted eyebrows |
 | `happy` | Gently narrowed happy eyes |
-| `sleepy` | Reserved expression identifier; closed eyes are controlled by sleeping state |
+| `sleepy` | Half-closed eyes; full sleep/nap also shows closed-eye paths |
 
 At three single clicks within four seconds the face becomes annoyed; at five it
 uses the angry animation. Double-clicks cancel pending single-click reactions.
@@ -119,3 +119,47 @@ completion callbacks. Future activities use the same `complete_<id>` convention.
 The Rive adapter must preserve hit-testing, gaze, reduced motion, independent
 talking, no timers while hidden/paused and deterministic cleanup. Physics and
 dialogue never access a Rive artboard or state machine directly.
+
+## Milestone 3 activity contract
+
+| Animation ID | Placeholder / duration | Proposed Rive trigger |
+| --- | --- | --- |
+| look_around | Three discrete head directions, 2.4 s | play_look_around |
+| sitting | Existing compressed static pose, held 5 s | play_sitting |
+| yawn | Closed eyes and open lower beak, 1.8 s | play_yawn |
+| stretch | Wings raised, body extended, 1.8 s | play_stretch |
+| dance | Side-to-side bob, four 0.5 s repetitions | play_dance |
+| side_eye | Narrow eyes tracking cursor and slanted brows, 2 s | play_side_eye |
+| nap | Static doze with z letters, 15 s; scheduler requires sleepiness > 70 | play_nap |
+| strike | Static tiny ON STRIKE placard, 8 s | play_strike |
+| sunglasses | Donning pose, 2 s; independent glasses accessory remains about 120 s | play_sunglasses |
+| bread_snack | Tiny bread near beak, five discrete nibbles in 3.5 s | play_bread_snack |
+| visitor | Smaller grey duckling enters at window's left edge, looks toward Ducky, leaves in 10 s | play_visitor |
+
+Rive should emit `complete_<id>` for each finite clip; glasses completion means
+the donning clip, not accessory removal. Add a boolean `sunglasses` input on the
+Accessories layer, driven by `CharacterSurface.setSunglasses(active)`. Main owns
+expiry; the renderer never inspects SVG groups or schedules behaviour. The visitor
+lives in the existing 320 x 300 artboard/window. It and props are click-through,
+without extra native windows or hit regions.
+
+Main activity timeouts return to idle even if renderer completion is throttled.
+Completion is informational, not authority to start events. Glasses coexist with
+ordinary poses. Pause/hide/sleep, drag and fullscreen cancel active clips.
+Reduced motion uses static poses and a stationary visible visitor. New CSS loops
+are finite; signs, naps and glasses have no per-frame work. Idle breath remains
+four discrete poses followed by eight seconds at rest.
+
+For Claude's screenshots, quit the existing instance, build, then launch:
+
+```powershell
+npm run build
+.\node_modules\.bin\electron.cmd . --debug-activity yawn
+```
+
+Repeat with each ID above. `idle`, `walk_left` and `walk_right` are also accepted
+scheduler IDs; walking uses adapter ID `walking`. The request runs once after the
+first non-fullscreen geometry sample and is ignored in packaged builds. There is
+no settings list of Easter eggs or debug IPC. Verify clipping, reduced motion,
+gaze, click-through, interruptions and expiry on desktop; unit tests do not claim
+visual acceptance.

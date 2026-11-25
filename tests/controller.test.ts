@@ -1,10 +1,14 @@
+import { app } from 'electron';
+import { ACTIVITY_DURATION, type Behaviour } from '../src/core/behaviour';
+import type { EmotionEngine } from '../src/core/emotions';
+import type { Memory } from '../src/core/memory';
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrowserWindow } from 'electron';
 import type { ForegroundSample } from '../src/core/awareness';
 import type { SettingsStore } from '../src/main/settings/store';
 import type { Point, Settings } from '../src/shared/types';
-import { DEFAULT_SETTINGS } from '../src/shared/schemas/settings';
+import { DEFAULT_SETTINGS, parseSettings } from '../src/shared/schemas/settings';
 import { CompanionController } from '../src/main/companion/CompanionController';
 import type { Situation } from '../src/core/dialogue';
 const driver = vi.hoisted(() => ({
@@ -13,7 +17,7 @@ const driver = vi.hoisted(() => ({
   configure: vi.fn(), dispose: vi.fn(),
 }));
 vi.mock('electron', () => ({
-  app: { getVersion: () => 'test', getAppMetrics: () => [], setLoginItemSettings: vi.fn() },
+  app: { isPackaged: false, getVersion: () => 'test', getAppMetrics: () => [], setLoginItemSettings: vi.fn() },
   powerMonitor: { getSystemIdleTime: () => driver.idle },
   systemPreferences: { getAnimationSettings: () => ({ prefersReducedMotion: false }) },
   screen: { getAllDisplays: () => [{ id: 1, workArea: { x: 0, y: 0, width: 1920, height: 1080 } }],
@@ -25,7 +29,7 @@ vi.mock('../src/main/platform/cursor', () => ({ CursorPoller: class {
 } }));
 vi.mock('../src/main/platform/awareness', () => ({ AppAwareness: class {
   constructor(sample: (value: ForegroundSample) => void, status: (active: boolean) => void) { driver.sample = sample; driver.status = status; }
-  configure(active: boolean) { driver.configure(active); if (!active) driver.status(false); }
+  configure(active: boolean, identity: boolean) { driver.configure(active && identity); if (!active) driver.status(false); }
   dispose() { driver.dispose(); driver.status(false); }
 } }));
 let controller: CompanionController;
@@ -39,9 +43,9 @@ function fakeWindow() {
 function create(patch: Partial<Settings> = {}) {
   window = fakeWindow();
   const store = { value: { ...DEFAULT_SETTINGS, walking: false, firstLaunchDone: true, ...patch },
-    update(patch: Partial<Settings>) { this.value = { ...this.value, ...patch }; }, flush: vi.fn() };
+    update(patch: Partial<Settings>) { this.value = parseSettings({ ...this.value, ...patch }); }, flush: vi.fn() };
   controller = new CompanionController(window as unknown as BrowserWindow, store as unknown as SettingsStore, vi.fn());
-  window.emit('ready-to-show'); return controller;
+  window.emit('ready-to-show'); driver.sample({ app: null, fullscreen: false }); return controller;
 }
 function click() {
   const bounds = window.setBounds.mock.calls.at(-1)![0] as Point;
@@ -197,5 +201,83 @@ describe('controller local AI boundaries', () => {
     driver.sample({ app: null, fullscreen: false, private: true });
     expect(controller.state.brain.phase).toBe('suspended');
     fetcher.mockClear(); await controller.testAI(); expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+// These probes exercise main-process wiring with no renderer or native helper.
+function internals() { return controller as unknown as { performActivity(id: Behaviour): void; emotions: EmotionEngine; memory: Memory; nextThought: number; ambientTick(): void }; }
+describe('Milestone 3 controller integration', () => {
+  it('blocks autonomous events after helper loss until a new safe geometry sample', () => {
+    create(); internals().performActivity('strike'); driver.status(false);
+    expect(controller.state.animation).toBe('idle');
+    internals().performActivity('visitor'); expect(controller.state.animation).toBe('idle');
+    driver.sample({ app: null, fullscreen: true }); internals().performActivity('visitor'); expect(controller.state.animation).toBe('idle');
+    driver.sample({ app: null, fullscreen: false }); internals().performActivity('visitor'); expect(controller.state.animation).toBe('visitor');
+  });
+  it.each(['look_around', 'sitting', 'yawn', 'stretch', 'dance', 'side_eye', 'nap', 'strike', 'bread_snack', 'visitor'] as const)('holds %s for its bounded duration then returns to idle', id => {
+    create(); internals().performActivity(id); expect(controller.state.animation).toBe(id);
+    vi.advanceTimersByTime(ACTIVITY_DURATION[id]! - 1); expect(controller.state.animation).toBe(id);
+    vi.advanceTimersByTime(1); expect(controller.state.animation).toBe('idle');
+  });
+  it('keeps sunglasses through interactions for about two minutes without holding a motion loop', () => {
+    create(); internals().performActivity('sunglasses'); expect(controller.state.sunglasses).toBe(true);
+    vi.advanceTimersByTime(2000); expect(controller.state.animation).toBe('idle'); expect(controller.state.sunglasses).toBe(true);
+    click(); vi.advanceTimersByTime(1000); expect(controller.state.sunglasses).toBe(true);
+    vi.advanceTimersByTime(120000); expect(controller.state.sunglasses).toBe(false);
+  });
+  it.each(['hide', 'pause', 'drag', 'fullscreen'] as const)('cancels an event on %s and does not resurrect it', action => {
+    create(); internals().performActivity('visitor'); expect(controller.state.animation).toBe('visitor');
+    if (action === 'hide') controller.setVisible(false);
+    if (action === 'pause') controller.togglePause();
+    if (action === 'drag') controller.startDrag({ x: 160, y: 250 });
+    if (action === 'fullscreen') driver.sample({ app: null, fullscreen: true });
+    vi.advanceTimersByTime(12000);
+    if (action === 'hide') controller.setVisible(true);
+    if (action === 'pause') controller.togglePause();
+    expect(controller.state.animation).not.toBe('visitor');
+  });
+  it('freezes emotions while hidden and updates the adapter emotion from active ticks', () => {
+    create(); const e = internals().emotions; e.values.irritation = 90;
+    vi.advanceTimersByTime(30000); expect(controller.state.emotion).toBe('angry');
+    controller.setVisible(false); const values = { ...e.values }; vi.advanceTimersByTime(600000); expect(e.values).toEqual(values);
+    controller.setVisible(true); vi.advanceTimersByTime(30000); expect(e.values.irritation).toBeLessThan(values.irritation);
+  });
+  it("keeps today's mood through preset changes and emits a new daily mood once", () => {
+    create(); const mood = controller.state.mood, changed = vi.fn(); controller.events.on('MOOD_CHANGED', changed);
+    controller.updateSettings({ personality: 'unhinged' }); expect(controller.state.mood).toBe(mood);
+    vi.setSystemTime(new Date(2026, 10, 26, 12)); vi.advanceTimersByTime(30000);
+    expect(changed).toHaveBeenCalledTimes(1); expect(controller.store.value.dailyMood?.date).toBe('2026-11-26');
+    vi.advanceTimersByTime(30000); expect(changed).toHaveBeenCalledTimes(1);
+  });
+  it('clears the preferred name, counters and AI history when forgotten or disabled', () => {
+    create({ preferredName: 'Alex' }); click(); vi.advanceTimersByTime(1);
+    expect(controller.state.memory.join(' ')).toContain('Alex'); expect(internals().memory.dailyPokes).toBeGreaterThan(0);
+    controller.forgetMemory(); expect(controller.state.settings.preferredName).toBe(''); expect(internals().memory.dailyPokes).toBe(0);
+    controller.updateSettings({ memoryEnabled: false }); click(); vi.advanceTimersByTime(1);
+    expect(controller.state.memory).toEqual([]); expect(internals().memory.totalPickups).toBe(0);
+    controller.updateSettings({ preferredName: 'Ignored' }); expect(controller.state.settings.preferredName).toBe('');
+  });
+  it('shows a milestone once then permits ordinary thoughts later that day', () => {
+    create(); internals().memory.daysTogether = 7; internals().nextThought = 0; internals().ambientTick();
+    expect(controller.state.bubble).toContain('7 days');
+    controller.dismissBubble(); vi.advanceTimersByTime(600000); internals().nextThought = 0; internals().ambientTick();
+    expect(controller.state.bubble).not.toContain('7 days');
+  });
+  it('geometry-only samples leave an in-flight local AI thought and recent voice intact', async () => {
+    const fetcher = await createWithAI(); controller.updateSettings({ appAwareness: false }); await flushAI(); fetcher.mockClear();
+    let complete!: (response: Response) => void;
+    fetcher.mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    requestSituation('thought'); const signal = fetcher.mock.calls.at(-1)![1]!.signal!;
+    driver.sample({ app: null, fullscreen: false }); expect(signal.aborted).toBe(false);
+    complete(new Response(JSON.stringify({ message: { content: aiJSON() } }))); await flushAI(); expect(controller.state.bubble).toBe(aiLine);
+  });
+  it('honors --debug-activity only in development and validates its id', () => {
+    const original = process.argv;
+    try {
+      process.argv = [...original, '--debug-activity', 'strike']; create(); expect(controller.state.animation).toBe('strike'); controller.dispose();
+      Object.defineProperty(app, 'isPackaged', { value: true, configurable: true }); create(); expect(controller.state.animation).toBe('idle'); controller.dispose();
+      Object.defineProperty(app, 'isPackaged', { value: false, configurable: true });
+      process.argv = [...original, '--debug-activity', 'shell']; create(); expect(controller.state.animation).toBe('idle');
+    } finally { process.argv = original; Object.defineProperty(app, 'isPackaged', { value: false, configurable: true }); }
   });
 });

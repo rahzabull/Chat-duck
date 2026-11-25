@@ -9,6 +9,21 @@ function fakeChild() {
 }
 afterEach(() => vi.useRealTimers());
 describe('foreground helper lifecycle', () => {
+  it('switches geometry/identity modes without recursion, overlap or leaking names', () => {
+    const children = [fakeChild(), fakeChild(), fakeChild()];
+    const launch = vi.fn().mockReturnValueOnce(children[0]).mockReturnValueOnce(children[1]).mockReturnValueOnce(children[2]);
+    const sample = vi.fn();
+    const helper = new AppAwareness(sample, vi.fn(), () => [], launch as typeof spawn);
+    helper.configure(true, false);
+    expect(String(launch.mock.calls[0][1].at(-1))).not.toContain('QueryFullProcessImageName');
+    children[0].stdout.write('chrome.exe|1\n'); expect(sample).toHaveBeenLastCalledWith({ app: null, fullscreen: true });
+    helper.configure(true, true); expect(launch).toHaveBeenCalledTimes(1); expect(children[0].kill).toHaveBeenCalledOnce();
+    children[0].emit('close'); expect(launch).toHaveBeenCalledTimes(2);
+    children[1].stdout.write('chrome.exe|0\n'); expect(sample).toHaveBeenLastCalledWith({ app: { name: 'Chrome', category: 'browser' }, fullscreen: false });
+    helper.configure(true, false); children[1].emit('close'); expect(launch).toHaveBeenCalledTimes(3);
+    children[2].stdout.write('chrome.exe|0\n'); expect(sample).toHaveBeenLastCalledWith({ app: null, fullscreen: false });
+    helper.dispose(); expect(children[2].kill).toHaveBeenCalledOnce(); children[2].emit('close');
+  });
   it('is off by default, starts one hidden helper, parses chunked lines, and kills on disable', () => {
     const child = fakeChild(); const spawnMock = vi.fn(() => child); const sample = vi.fn(); const status = vi.fn();
     const helper = new AppAwareness(sample, status, () => [42], spawnMock as unknown as typeof spawn);

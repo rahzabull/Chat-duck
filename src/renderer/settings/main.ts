@@ -1,11 +1,13 @@
 import { createElement as h, useEffect, useState, type ChangeEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Command, CompanionState, EditableSettings } from '../../shared/types';
+import { PRESETS } from '../../core/dialogue/presets';
 import './style.css';
 
 function SettingsApp() {
   const [state, setState] = useState<CompanionState>();
   const [error, setError] = useState('');
+  const [forgetting, setForgetting] = useState(false);
   const [testing, setTesting] = useState(false);
   useEffect(() => {
     const unsubscribe = window.ducky.onState(setState);
@@ -19,7 +21,7 @@ function SettingsApp() {
   function command(value: Command): void { void window.ducky.command(value).catch(() => setError('That action could not be completed.')); }
   if (!state) return h('p', { role: 'status' }, error || 'Waking up the settings…');
   const settings = state.settings;
-  function check(key: 'alwaysOnTop' | 'desktopOnly' | 'launchAtStartup' | 'walking' | 'reducedMotion' | 'mute' | 'appAwareness' | 'aiEnabled', label: string) {
+  function check(key: 'alwaysOnTop' | 'desktopOnly' | 'launchAtStartup' | 'walking' | 'reducedMotion' | 'mute' | 'appAwareness' | 'aiEnabled' | 'profanity' | 'memoryEnabled', label: string) {
     return h('label', { className: 'check', key },
       h('input', { type: 'checkbox', checked: settings[key], onChange: (event: ChangeEvent<HTMLInputElement>) => save({ [key]: event.target.checked }) }), label);
   }
@@ -34,7 +36,12 @@ function SettingsApp() {
       h('input', { id: 'size', type: 'range', min: 0.6, max: 1.6, step: 0.1, value: settings.characterSize,
         onChange: (event: ChangeEvent<HTMLInputElement>) => save({ characterSize: Number(event.target.value) }) }),
       h('button', { type: 'button', onClick: () => command('reset') }, 'Reset position')),
-    h('section', { 'aria-labelledby': 'behaviour' }, h('h2', { id: 'behaviour' }, 'Behaviour'),
+    h('section', { 'aria-labelledby': 'behaviour' }, h('h2', { id: 'behaviour' }, 'Personality'),
+      ...Object.values(PRESETS).map(preset => h('label', { key: preset.id, className: 'preset-card' }, h('input', { type: 'radio', name: 'personality', value: preset.id, checked: settings.personality === preset.id, onChange: () => save({ personality: preset.id }) }), h('strong', null, preset.label), h('span', null, preset.description))),
+      h('p', { className: 'hint' }, `Today's mood: ${state.mood}`),
+      h('label', { htmlFor: 'activity-level' }, 'Activity level'),
+      h('select', { id: 'activity-level', value: settings.activityLevel, onChange: (event: ChangeEvent<HTMLSelectElement>) => save({ activityLevel: event.target.value as EditableSettings['activityLevel'] }) }, ...['calm', 'normal', 'lively'].map(level => h('option', { key: level, value: level }, level))),
+      check('profanity', 'Allow mild swearing'), h('p', { className: 'hint' }, 'Mild swearing only. Never at you.'),
       check('walking', 'Let Ducky walk around'),
       h('label', { htmlFor: 'talkativeness' }, 'Talkativeness'),
       h('select', { id: 'talkativeness', value: settings.talkativeness,
@@ -68,6 +75,17 @@ function SettingsApp() {
       state.brain.version && h('p', { className: 'hint' }, `Ollama ${state.brain.version}`),
       state.brain.sample && h('p', { className: 'hint' }, `Sample: ${state.brain.sample}`),
       h('p', { className: 'hint' }, 'Install Ollama and pull a model yourself, then test the connection to refresh this list. Ducky never downloads models.')),
+    h('section', { 'aria-labelledby': 'memory' }, h('h2', { id: 'memory' }, 'Memory'),
+      check('memoryEnabled', 'Let Ducky remember things'),
+      h('label', { htmlFor: 'preferred-name' }, 'What should Ducky call you?'),
+      h('input', { id: 'preferred-name', type: 'text', maxLength: 30, disabled: !settings.memoryEnabled, defaultValue: settings.preferredName, key: settings.preferredName, onBlur: (event: ChangeEvent<HTMLInputElement>) => save({ preferredName: event.target.value }) }),
+      h('h3', null, 'What Ducky remembers'),
+      h('ul', null, ...state.memory.map(line => h('li', { key: line }, line))),
+      h('p', { className: 'hint' }, 'Only your interactions with Ducky and the name you enter. No app history or screen data. Pickup counts roll off after seven days; totals and notable moments stay until forgotten. Turning memory off deletes them and your name.'),
+      h('button', { type: 'button', onClick: () => setForgetting(true) }, 'Forget everything'),
+      forgetting && h('div', { role: 'alert' }, h('p', null, 'Forget all interaction memories and your preferred name?'),
+        h('button', { type: 'button', onClick: () => { void window.ducky.forgetMemory().then(next => { setState(next); setForgetting(false); }).catch(() => setError('Could not delete memory. Please try again.')); } }, 'Yes, forget everything'),
+        h('button', { type: 'button', onClick: () => setForgetting(false) }, 'Cancel'))),
     h('section', { 'aria-labelledby': 'privacy' }, h('h2', { id: 'privacy' }, 'Privacy'),
       check('appAwareness', 'Let Ducky notice which app is in front'),
       h('p', { className: 'hint' }, "Ducky checks the name of the app in front every few seconds (like 'Chrome' or 'Figma') so he can comment on it. He never reads window titles, web pages, or screen contents. When local AI is enabled, the app name can go to Ollama on this computer. Recent lines stay temporarily in memory. Some apps are always ignored (password managers, banking, messaging)."),

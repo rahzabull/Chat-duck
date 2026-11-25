@@ -4,6 +4,7 @@ import { CHANNELS } from '../shared/constants';
 import type { Command, CompanionState } from '../shared/types';
 import { CompanionController } from './companion/CompanionController';
 import { registerIPC } from './ipc';
+import { MemoryStore } from './memory/store';
 import { SettingsStore } from './settings/store';
 import { DuckyTray } from './tray';
 import { createCompanion, createSettings, secureSession } from './windows';
@@ -64,7 +65,7 @@ else {
   app.whenReady().then(() => {
     secureSession();
     const store = new SettingsStore(join(app.getPath('userData'), 'settings.json'));
-    controller = new CompanionController(createCompanion(), store, broadcast);
+    controller = new CompanionController(createCompanion(), store, broadcast, new MemoryStore(join(app.getPath('userData'), 'memory.json'), store.value.memoryEnabled));
     tray = new DuckyTray(() => controller!.state, command);
     let menuKey = '';
     controller.onChanged = () => {

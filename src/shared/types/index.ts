@@ -2,6 +2,13 @@ export interface Point { x: number; y: number }
 export interface WorkArea extends Point { width: number; height: number; id: number }
 export type Direction = 'left' | 'right';
 export interface Settings {
+  personality: 'wholesome' | 'playful' | 'sarcastic' | 'unhinged';
+  profanity: boolean;
+  activityLevel: 'calm' | 'normal' | 'lively';
+  memoryEnabled: boolean;
+  preferredName: string;
+  installSeed: number;
+  dailyMood: { date: string; mood: import('../../core/emotions').Mood } | null;
   alwaysOnTop: boolean;
   desktopOnly: boolean;
   characterSize: number;
@@ -18,7 +25,7 @@ export interface Settings {
   firstLaunchDone: boolean;
   position: Point | null;
 }
-export type EditableSettings = Omit<Settings, 'firstLaunchDone' | 'position'>;
+export type EditableSettings = Omit<Settings, 'firstLaunchDone' | 'position' | 'installSeed' | 'dailyMood'>;
 export interface BrainState {
   phase: 'disabled' | 'offline' | 'warming' | 'connected' | 'error' | 'suspended';
   message: string;
@@ -28,6 +35,7 @@ export interface BrainState {
 }
 export interface CompanionState {
   visible: boolean; paused: boolean; sleeping: boolean; dragging: boolean;
+  sunglasses: boolean; mood: string; memory: string[];
   awarenessActive: boolean;
   brain: BrainState;
   animation: string; animationRevision: number; emotion: string; direction: Direction; movementSpeed: number;
@@ -38,6 +46,7 @@ export type Command = 'show' | 'hide' | 'pause' | 'mute' | 'reset' | 'settings' 
 export interface DuckyAPI {
   getState(): Promise<CompanionState>;
   testAI(): Promise<void>;
+  forgetMemory(): Promise<CompanionState>;
   updateSettings(patch: Partial<EditableSettings>): Promise<CompanionState>;
   command(command: Command): Promise<void>;
   hitTest(interactive: boolean): void;

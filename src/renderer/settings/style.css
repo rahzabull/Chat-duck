@@ -10,10 +10,15 @@ label { display: block; margin: 12px 0 6px; }
 .check { display: flex; align-items: center; gap: 9px; cursor: pointer; }
 input[type="checkbox"] { width: 17px; height: 17px; margin: 0; accent-color: #276a47; }
 input[type="range"] { width: 100%; margin: 8px 0 16px; accent-color: #276a47; }
-input[type="number"], select { display: block; width: 100%; padding: 8px; border: 1px solid #8c9f90; border-radius: 5px; color: inherit; background: white; font: inherit; }
+input[type="number"], input[type="text"], select { display: block; width: 100%; padding: 8px; border: 1px solid #8c9f90; border-radius: 5px; color: inherit; background: white; font: inherit; }
 button { border: 1px solid #8c9f90; border-radius: 7px; padding: 8px 12px; background: white; color: #234e36; font: inherit; cursor: pointer; }
 button:hover { background: #e5efdf; }
 :focus-visible { outline: 3px solid #4779ae; outline-offset: 3px; }
 .hint { color: #596b5e; font-size: 12px; line-height: 1.5; }
 .error { color: #8c2222; background: #fff1ee; padding: 10px; }
 footer { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 12px; }
+
+.preset-card { display: grid; grid-template-columns: 22px 1fr; gap: 5px 10px; border: 1px solid #bbc9bc; border-radius: 8px; padding: 10px; margin: 8px 0; cursor: pointer; }
+.preset-card span { grid-column: 2; font-size: .9em; }
+.preset-card:has(input:checked) { border-color: #318453; background: #edf6ec; }
+.preset-card input { accent-color: #276a47; }

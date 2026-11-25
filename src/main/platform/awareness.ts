@@ -6,12 +6,14 @@ import { awarenessScript } from './awareness-script';
 export class AppAwareness {
   private child?: ChildProcessWithoutNullStreams;
   private wanted = false;
+  private identity = true;
   private stopping = false;
   private retries = 0;
   private retryTimer?: ReturnType<typeof setTimeout>;
   constructor(private sample: (sample: ForegroundSample) => void, private status: (active: boolean) => void,
     private ownPids: () => number[], private launch = spawn) {}
-  configure(enabled: boolean): void {
+  configure(enabled: boolean, identity = true): void {
+    if (identity !== this.identity) { this.configure(false, this.identity); this.identity = identity; }
     if (enabled === this.wanted) return;
     this.wanted = enabled;
     if (!enabled) {
@@ -25,7 +27,7 @@ export class AppAwareness {
     this.stopping = false;
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = this.launch('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-Command', awarenessScript(process.pid, this.ownPids())],
+      child = this.launch('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-Command', awarenessScript(process.pid, this.ownPids(), this.identity)],
         { windowsHide: true, stdio: 'pipe' });
     } catch { this.failed(); return; }
     this.child = child;
@@ -42,7 +44,7 @@ export class AppAwareness {
         const line = buffer.slice(0, end); buffer = buffer.slice(end + 1);
         const sample = parseForegroundLine(line);
         if (!sample) continue;
-        this.status(true); this.sample(sample);
+        this.status(true); this.sample(this.identity ? sample : { app: null, fullscreen: sample.fullscreen });
         if (!child.stdin.destroyed) child.stdin.write([process.pid, ...this.ownPids()].join(',') + '\n');
       }
     });

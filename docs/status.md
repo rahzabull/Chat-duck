@@ -1,5 +1,43 @@
 # Ducky implementation status
 
+## Milestone 3 - Give Ducky a personality (2026-11-25)
+
+| Feature | Implemented | Unit-tested | Verified-on-desktop |
+| --- | --- | --- | --- |
+| Four preset cards, talkativeness, activity level, profanity | Yes; presets.ts text preserved | Schemas, seeded voice differences, 75%/30% selection, shared recent exclusion | Pending Claude |
+| AI preset style/examples, mild language, strong/slur and guilt rejection | Yes | Prompt allowlist and language cases; model event restrictions | Pending Claude |
+| Seven numeric emotions, weighted daily mood, MOOD_CHANGED, idle faces | Yes | Decay, inputs, caps, daily stability, no away penalty, timer suspension | Pending Claude |
+| Weighted finite activities and cooldowned Easter eggs | Yes | Frequency, sleepiness gate, cooldowns, visitor long-run rate, controller durations/cancellation | Pending Claude |
+| Fullscreen suppression with app awareness off | Yes; geometry-only helper mode | Generated API boundary and suppression | Pending Claude |
+| memory.json, readable settings, name, confirmed forget/disable | Yes | Validation, retention, aggregates, atomic debounce, deletion/canceled writes | Pending Claude |
+| Memory greetings, pickup receipts, 7/30/100 run-day milestones | Yes | Templates, cooldowns, controller milestone handling | Pending Claude |
+| Shorter daily click/drag patience; gentle hovers and daily reset | Yes | Input, interaction and controller tests | Pending Claude |
+| Development --debug-activity flag | Yes; ignored when packaged | Allowlist, forced activity, packaged rejection | Pending Claude |
+| Adapter boundary and idle performance | Finite clips/static props; no new continuous idle animation | IDs, activity duration and cancellation | Pending Claude / CPU measurement |
+
+Validation for M3:
+
+- `npm run typecheck`: passed.
+- `npm test`: 447 passed in 21 files; two existing opt-in native helper tests
+  skipped. The manual Ollama bake-off remains excluded from the default run.
+- `npm run build`: passed for main, preload and both renderers.
+- `git diff --check`: clean.
+- No commit, new dependency, network request, Notion or MCP use.
+
+Desktop handoff: see animation-contract.md for the debug command and IDs. Compare
+the four voices; toggle profanity and memory; inspect memory.json; confirm Forget
+everything removes it and clears the name; screenshot each new activity; repeat
+the stationary-idle CPU measurement with settings closed. Include the geometry
+helper in process CPU/memory totals. Fullscreen detection retains a three-second
+sampling delay and startup compilation delay. Autonomous activity waits for a
+known safe sample and stops if the helper becomes unavailable. No native, visual
+or performance acceptance is claimed by unit tests.
+
+Some supplied preset lines conflict with no guilt or never-at-you swearing. They
+remain untouched in source and are excluded at selection time and from AI
+examples. Numeric emotions remain transient; only mood/date, install seed and
+bounded interaction aggregates persist. Real-model voice comparison is pending.
+
 ## Milestone 2 — Local hybrid brain (2026-11-25)
 
 This section supersedes historical claims below that no AI is connected or that

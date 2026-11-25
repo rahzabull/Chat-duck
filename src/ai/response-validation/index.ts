@@ -11,6 +11,14 @@ export function similarity(a: string, b: string): number {
 }
 const invented = /\b(tabs?|websites?|sites?|pages?|videos?|emails?|messages?|cats?|dogs?|files?)\b/gi;
 const profanity = /\b(fuck\w*|shit\w*|bullshit|bitch\w*|ass|asshole\w*|arse\w*|bastard\w*|cunt\w*|dick\w*|piss\w*|damn\w*|crap|wtf|stfu)\b/i;
+const strong = /\b(fuck\w*|bullshit|bitch\w*|ass|asshole\w*|arse\w*|bastard\w*|cunt\w*|dick\w*|piss\w*|wtf|stfu|nigg\w*|fagg\w*|retard\w*|kike\w*|chink\w*|trann\w*|spic)\b/i;
+export function rejectedLanguage(text: string, allowed: boolean): boolean {
+  const normalized = text.normalize('NFKC').replace(/[\u200b-\u200f\u2060\ufeff]/g, '').replace(/(?<=\w)!(?=\w)/g, 'i').replace(/[0@13$]/g, c => ({'0':'o','@':'a','1':'i','!':'i','3':'e','$':'s'})[c]!);
+  if (strong.test(normalized)) return true;
+  if (!allowed) return profanity.test(normalized) || /\b(hell|bloody)\b|for f[\u2014\u2013-]/i.test(normalized);
+  const rest = normalized.replace(/\b(damn|hell|shit|crap|bloody)\b/gi, '').replace(/for f[\u2014\u2013-]+(?:\s*sake)?/gi, '');
+  return profanity.test(rest) || /\b(?:you(?:'re| are)?|your)\b.{0,25}\b(?:damn|hell|shit|crap|bloody)\b|\b(?:damn|hell|shit|crap|bloody)\b.{0,25}\b(?:you|your)\b/i.test(normalized);
+}
 const timeEvents = new Set(['late_night_working', 'sleepy_late', 'thought_late', 'thought_morning']);
 const smallNumbers = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
   'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
@@ -54,7 +62,7 @@ function validBeat(text: string, limit: number, context: AIContext, recent: read
   if (/[\r\n\u2028\u2029\u0000-\u001f\u007f\u0085]/u.test(text) || /[\p{Extended_Pictographic}\p{Regional_Indicator}\u200d\ufe0f\u20e3]/u.test(text)) return false;
   if (/[^\x00-\x7f]/u.test(text.replace(/[^\p{N}]/gu, ''))) return false;
   if (/(?:\b[a-z][a-z0-9+.-]*:\/\/|(?:https?|mailto|data|javascript|file):|www\.|\b[\w.-]+\.[a-z]{2,}(?:\b|\/)|\b\S+@\S+)|[`*_#<>\[\]{}|~]|^\s*(?:[-+>]\s|\d+[.)]\s|[-=]{3,}\s*$)/i.test(text)) return false;
-  if (/^\s*(?:seriously\b|ugh\b|oh great\b|well,|as a duck\b|as an ai\b)/i.test(text) || profanity.test(text)) return false;
+  if (/^\s*(?:seriously\b|ugh\b|oh great\b|well,|as a duck\b|as an ai\b)/i.test(text) || rejectedLanguage(text, context.profanity === true) || /miss(?:ed)? you|lonely without|abandon(?:ed)? me|why did you leave/i.test(text)) return false;
   const withoutTimes = groundedTimes(text, context);
   if (withoutTimes === undefined) return false;
   const { localTime: _localTime, ...otherFacts } = context;
@@ -81,5 +89,5 @@ export function validateResponse(raw: string, context: AIContext, recent: readon
   const [, , priority, emotion, animation] = POLICIES[context.event];
   return { kind: 'speech', speech: { text: dialogue, then: then || undefined, priority,
     emotion: (EMOTION_IDS as readonly string[]).includes(value.emotion) ? value.emotion as EmotionId : emotion,
-    animation: (ANIMATION_IDS as readonly string[]).includes(value.animation) ? value.animation as AnimationId : animation } };
+    animation: (ANIMATION_IDS as readonly string[]).includes(value.animation) && !['strike', 'sunglasses', 'bread_snack', 'visitor', 'nap'].includes(value.animation) ? value.animation as AnimationId : animation } };
 }

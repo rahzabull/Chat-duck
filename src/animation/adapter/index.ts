@@ -1,4 +1,5 @@
 export const ANIMATION_IDS = [
+  'look_around', 'yawn', 'stretch', 'dance', 'side_eye', 'nap', 'strike', 'sunglasses', 'bread_snack', 'visitor',
   'idle', 'blink', 'look_left', 'look_right', 'walking', 'startled', 'picked_up',
   'falling', 'landing', 'sleeping', 'waking_up', 'angry', 'happy', 'talking', 'sitting',
 ] as const;
@@ -25,5 +26,6 @@ export interface CharacterSurface extends CharacterAnimationAdapter {
   setReducedMotion(active: boolean): void;
   setPaused(active: boolean): void;
   setTalking(active: boolean): void;
+  setSunglasses(active: boolean): void;
   setDebugHitbox(active: boolean): void;
 }

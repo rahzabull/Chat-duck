@@ -8,6 +8,7 @@ function subscribe<T>(channel: string, callback: (payload: T) => void): () => vo
   return () => ipcRenderer.removeListener(channel, listener);
 }
 const api: DuckyAPI = {
+  forgetMemory: () => ipcRenderer.invoke(CHANNELS.forgetMemory),
   testAI: () => ipcRenderer.invoke(CHANNELS.testAI),
   getState: () => ipcRenderer.invoke(CHANNELS.getState),
   updateSettings: patch => ipcRenderer.invoke(CHANNELS.updateSettings, patch),

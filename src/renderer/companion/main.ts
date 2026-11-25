@@ -36,7 +36,7 @@ function render(next: CompanionState): void {
   adapter.setEmotion(next.emotion); adapter.setDirection(next.direction);
   adapter.setMovementSpeed(next.movementSpeed); adapter.setDebugHitbox(next.debugHitbox);
   if (!previous || previous.animationRevision !== next.animationRevision) adapter.play(next.animation);
-  adapter.setTalking(!!next.bubble);
+  adapter.setTalking(!!next.bubble); adapter.setSunglasses(next.sunglasses);
   if (bubble.textContent !== (next.bubble ?? '')) bubble.textContent = next.bubble ?? '';
   bubble.hidden = !next.bubble; bubble.classList.toggle('debug', next.debugHitbox);
   if (lastCursor) adapter.setEyeTarget(lastCursor.cursor.x - lastCursor.origin.x, lastCursor.cursor.y - lastCursor.origin.y);

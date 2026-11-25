@@ -1,3 +1,4 @@
+import { ACTIVITY_DURATION } from '../../core/behaviour';
 import { ANIMATION_IDS, EMOTION_IDS, type CharacterSurface } from '../adapter';
 import './style.css';
 
@@ -34,9 +35,13 @@ export class PlaceholderDuck implements CharacterSurface {
           <g class="brows" stroke="#65531b" stroke-width="3" stroke-linecap="round"><path class="brow-left" d="M134 180l19 0"/><path class="brow-right" d="M167 180l19 0"/></g>
           <ellipse data-duck-hit class="beak-bottom" cx="168" cy="224" rx="23" ry="8" fill="#d87524"/>
           <ellipse data-duck-hit cx="168" cy="217" rx="25" ry="9" fill="#ff9a32"/>
+          <g class="sunglasses" fill="#26302f" stroke="#26302f" stroke-width="3"><rect x="129" y="190" width="29" height="19" rx="5"/><rect x="164" y="190" width="29" height="19" rx="5"/><path d="M156 195h10"/><path d="M134 194l13 0" stroke="#a9c9be" stroke-width="2"/></g>
+          <g class="bread"><path d="M181 232v-18q-5-9 4-12h13q10 3 5 12v18Z" fill="#eac48b" stroke="#a96930" stroke-width="3"/><circle cx="190" cy="215" r="2" fill="#b48249"/></g>
           <g class="hat" fill="#318453"><path data-duck-hit d="M130 172l7-29q22-12 43 0l7 29Z"/><ellipse data-duck-hit cx="158" cy="172" rx="43" ry="8" fill="#246c44"/><path d="M135 158q23 7 47 0" fill="none" stroke="#9ac675" stroke-width="5"/></g>
         </g>
       </g></g>
+      <g class="placard"><path d="M219 282v-68" stroke="#9f703f" stroke-width="5"/><rect x="188" y="186" width="100" height="39" rx="3" fill="#fff6d8" stroke="#95744a" stroke-width="2"/><text x="238" y="211" text-anchor="middle" fill="#38382d" font-family="sans-serif" font-size="14" font-weight="bold">ON STRIKE</text></g>
+      <g class="visitor"><g transform="translate(0 168) scale(.43)"><ellipse cx="140" cy="280" rx="42" ry="11" fill="#b47d36"/><ellipse cx="140" cy="246" rx="47" ry="34" fill="#939d9c"/><ellipse cx="146" cy="202" rx="37" ry="35" fill="#bac2bf"/><ellipse cx="174" cy="216" rx="20" ry="8" fill="#daa34b"/><circle cx="158" cy="195" r="7" fill="white"/><circle cx="160" cy="196" r="3" fill="#26302f"/><ellipse cx="117" cy="245" rx="12" ry="23" fill="#75817e"/></g></g>
       <g class="zzz" fill="#385d4b" font-family="sans-serif" font-weight="bold"><text x="218" y="170" font-size="18">z</text><text x="238" y="148" font-size="23">z</text></g>
     </svg>`;
     this.root = host.querySelector('svg')!; this.pupils = this.root.querySelectorAll('.pupil');
@@ -52,7 +57,7 @@ export class PlaceholderDuck implements CharacterSurface {
     this.animation = animation; this.root.dataset.animation = animation;
     this.stopBreath(); this.scheduleBreath();
     if (this.completion) clearTimeout(this.completion); this.completion = undefined;
-    const durations: Record<string, number> = { blink: 150, startled: 650, landing: 430, waking_up: 900, angry: 750, happy: 750, look_left: 1500, look_right: 1500 };
+    const durations: Record<string, number | undefined> = { ...ACTIVITY_DURATION, sunglasses: 2000, blink: 150, startled: 650, landing: 430, waking_up: 900, angry: 750, happy: 750, look_left: 1500, look_right: 1500 };
     if (durations[animation] && this.visible && !this.paused) this.completion = setTimeout(() => {
       this.completion = undefined; this.listeners.forEach(callback => callback(animation));
     }, durations[animation]);
@@ -89,6 +94,7 @@ export class PlaceholderDuck implements CharacterSurface {
     this.reduced = active; this.root.classList.toggle('reduced', active);
     if (active) this.stopBreath(); else this.scheduleBreath();
   }
+  setSunglasses(active: boolean): void { this.root.classList.toggle('wearing-sunglasses', active); }
   setTalking(active: boolean): void { this.root.classList.toggle('talking', active); }
   setDebugHitbox(active: boolean): void { this.root.classList.toggle('debug-hitbox', active); }
   hitTest(x: number, y: number): boolean {
