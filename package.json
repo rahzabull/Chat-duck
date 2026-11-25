@@ -29,6 +29,7 @@
     "vitest": "5.1.1"
   },
   "dependencies": {
+    "chrono-node": "2.10.3",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
@@ -39,10 +40,18 @@
   "build": {
     "appId": "com.ente.ducky",
     "productName": "Ducky",
-    "directories": { "output": "release" },
+    "directories": {
+      "output": "release"
+    },
     "electronDist": "node_modules/electron/dist",
     "npmRebuild": false,
-    "files": ["out/**/*", "package.json"],
-    "win": { "target": "dir", "signAndEditExecutable": false }
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "dir",
+      "signAndEditExecutable": false
+    }
   }
 }
