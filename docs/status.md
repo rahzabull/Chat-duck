@@ -1,4 +1,69 @@
-# Milestone 1 status
+# Ducky implementation status
+
+The personality and opt-in app-awareness update below supersedes the corresponding
+Milestone 1 dialogue/fullscreen limitations. Earlier desktop results remain
+historical; they do not verify the new interaction behavior.
+
+## Personality and app awareness ? 2026-11-25
+
+Implemented:
+
+- Curated `DialogueDirector`, one tuning table, injected RNG/clock, all template
+  slots (including local time and human away durations), weighted shuffled bags,
+  last-twelve exclusion, talkativeness scaling, and situation cooldowns. Only
+  accepted speech consumes a line. Small exhausted pools stay silent.
+- Hover enter/linger/revisits, four-second click escalation and forgiveness,
+  repeated pickups, long holds, fast horizontal shake detection, final-settle
+  big/small/wall landings, away-duration wakes, walking remarks, first launch,
+  local-time thoughts, and forty-five-minute late-night gating.
+- Two-beat speech replaces the first bubble after 1.5?2.5 seconds. Speech expiry
+  is length-based; the conversational follow-up intentionally replaces its first
+  beat sooner. Clicking/dragging/dismissal or higher-priority speech cancels the
+  follow-up. Talking stays adapter-owned and continuous between beats.
+- Opt-in Settings > Privacy checkbox, active indicator, hidden persistent
+  PowerShell/C# helper, three-second foreground identity/fullscreen checks,
+  private-name filtering, mapped categories, session thresholds, switching
+  comments, fullscreen suppression, bounded restart, and cleanup.
+- No model, dependencies, network use, commits, or SVG-boundary changes. The
+  authored `lines.ts` is unchanged. Its one self-identifying AI sentence is
+  excluded by the director; the remaining app-ai lines can still mention the
+  actual foreground app by name.
+
+Verification:
+
+- `npm run typecheck`: passed.
+- `npm test`: 145 passed in 13 files; two native checks in one file are skipped
+  by default because they deliberately inspect the current foreground executable.
+- `DUCKY_NATIVE_HELPER_TEST=1 npm test -- tests/awareness-native.test.ts`:
+  both native checks passed separately on Windows (use PowerShell env syntax).
+- `npm run build`: passed; `git diff --check`: clean.
+- The existing Vite future-config-loader warning is unchanged and non-fatal.
+- Real Windows helper tests pass: valid samples three seconds apart, PID gone
+  after disable, and no orphan helper after its owner exits without disposal.
+- Controller tests use mocked Electron and real dialogue/context/physics logic:
+  first launch and follow-up interruption, click escalation/forgiveness, hover
+  linger, landing once after bounces, awareness lifecycle, and fullscreen gating.
+- The native check exposed a blocking Console.In.ReadLineAsync implementation in
+  Windows PowerShell; a blocking pipe reader on a managed background thread fixes
+  startup without adding foreground polling.
+
+Decisions and pending acceptance:
+
+- Ten-minute app gates are shared by category (including its long-session lines),
+  which is stricter than per-app cooldowns and avoids historical app-name storage.
+- Exclusions are executable-name patterns, not a complete banking-app registry.
+  Banking websites cannot be recognized without reading forbidden content. See
+  `privacy.md` for the exact limits and retained data.
+- Fullscreen suppression works only while opt-in awareness runs. Native fullscreen
+  geometry across mixed DPI/monitors still needs desktop verification.
+- The new voice timing, shake/drop gestures, visual Settings indicator, actual app
+  switching, real GUI Quit, and full-app idle CPU require desktop acceptance.
+  Historical round-2 CPU measurements below are not measurements of this update.
+- Preserve double-click-to-open-Settings behavior; rapid double-clicks can cancel
+  delayed click replies. Use spaced single clicks within four seconds for the
+  click-escalation desktop check.
+
+## Historical Milestone 1 status
 
 Implemented as a local prototype on 2026-11-25. Claude tested round 1 on Windows 11
 with two 4K monitors at 150% scaling. Results below describe that desktop test;
@@ -94,8 +159,8 @@ round-2 fixes were re-checked on the desktop (see below). Milestones 2–8 are n
   drag/fall/land on both monitors, top-edge clamping, context menu, settings,
   live size change, hide/show, IPC validation and clean quit. Fullscreen z-order,
   mixed scale factors and unlisted native edge cases remain unverified.
-- Fullscreen detection and automatic fullscreen suppression are later milestones.
-  Hide/Pause remain available manually through the tray.
+- Historical limitation, superseded above: fullscreen detection now works while
+  optional awareness runs. Hide/Pause remain available through the tray.
 - The renderer is hidden if it crashes; automatic renderer restart is not implemented.
   Quit/relaunch recovers the app. No long-duration CPU/GPU/memory profiling was done.
 - Speech is deliberately sparse and rejected while busy rather than queued.

@@ -1,20 +1,29 @@
 import { app, BrowserWindow, powerMonitor, screen, systemPreferences } from 'electron';
 import { BehaviourScheduler } from '../../core/behaviour';
-import { DialoguePool, type DialogueCategory } from '../../core/dialogue';
+import { DialogueDirector, thoughtDelay, thoughtSituation, type DialogueContext, type DirectedSpeech, type Situation } from '../../core/dialogue';
+import { InteractionContext, landingSituation, type SituationEvent } from '../../core/dialogue/context';
+import { AppSessionTracker } from '../../core/awareness';
 import { EventBus } from '../../core/events';
-import { SpeechQueue, type Priority } from '../../core/interruptions';
+import { SpeechQueue } from '../../core/interruptions';
 import { clampPosition, contains, createBody, groundY, moving, nearestArea, recover, release, resetPosition, step, VelocityHistory, walk, windowOrigin, type Body } from '../../core/physics';
 import { CHANNELS, WINDOW } from '../../shared/constants';
 import type { CompanionState, EditableSettings, Point } from '../../shared/types';
 import { CursorPoller } from '../platform/cursor';
 import { primaryArea, workAreas } from '../platform/displays';
 import type { SettingsStore } from '../settings/store';
+import { AppAwareness } from '../platform/awareness';
 
 export class CompanionController {
   readonly events = new EventBus();
   private body: Body;
   private scheduler = new BehaviourScheduler();
-  private dialogue = new DialoguePool();
+  private dialogue = new DialogueDirector();
+  private context = new InteractionContext();
+  private sessions = new AppSessionTracker();
+  private awareness: AppAwareness;
+  private nextThought = 0;
+  private nextLate = 0;
+  private fall?: { height: number; hitWall: boolean };
   private speech = new SpeechQueue();
   private velocity = new VelocityHistory();
   private cursor: CursorPoller;
@@ -24,8 +33,8 @@ export class CompanionController {
   private reactionTimer?: ReturnType<typeof setTimeout>;
   private bubbleTimer?: ReturnType<typeof setTimeout>;
   private clickTimer?: ReturnType<typeof setTimeout>;
-  private clickTimes: number[] = [];
-  private pendingClicks = 0;
+  private hoverTimer?: ReturnType<typeof setTimeout>;
+  private pendingClick: SituationEvent | null = null;
   private hovered = false;
   private grab?: { cursor: Point; offset: Point; moved: boolean };
   private reducedMotion = systemPreferences.getAnimationSettings().prefersReducedMotion;
@@ -36,7 +45,7 @@ export class CompanionController {
   onChanged: () => void = () => {};
 
   constructor(readonly window: BrowserWindow, readonly store: SettingsStore, private broadcast: (state: CompanionState) => void) {
-    this.state = { visible: true, paused: false, sleeping: false, dragging: false, animation: 'idle', animationRevision: 0, emotion: 'neutral',
+    this.state = { visible: true, paused: false, sleeping: false, dragging: false, awarenessActive: false, animation: 'idle', animationRevision: 0, emotion: 'neutral',
       direction: 'right', movementSpeed: 0, bubble: null, settings: store.value,
       debugHitbox: process.argv.includes('--debug-hitbox'), version: app.getVersion() };
     const saved = store.value.position;
@@ -46,28 +55,35 @@ export class CompanionController {
     this.cursor = new CursorPoller(point => {
       if (this.ready && !window.isDestroyed()) window.webContents.send(CHANNELS.cursor, { cursor: point, origin: this.windowOrigin() });
     }, point => this.dragSample(point), () => ({ ...this.windowOrigin(), ...this.size() }));
-    this.events.on('CHARACTER_CLICKED', ({ count }) => {
-      console.log('[ducky] Click count in four seconds:', count);
-      this.react(count >= 5 ? 'angry' : 'startled', count >= 3 ? 'angry' : 'startled');
-      if (count >= 5) this.sayCategory('annoyed', 'medium');
-      else if (Math.random() < this.speechChance()) this.sayCategory('click', 'medium');
+    this.nextThought = Date.now() + thoughtDelay(store.value.talkativeness);
+    this.awareness = new AppAwareness(sample => {
+      const previous = this.sessions.current?.name;
+      const events = this.sessions.observe(sample);
+      // No stale app punchlines after a switch, private app, or fullscreen entry.
+      if ((!sample.app || previous !== sample.app.name || sample.fullscreen) && this.speech.current?.priority === 'low') this.dismissBubble();
+      if (sample.fullscreen && this.speech.current?.priority === 'medium') this.dismissBubble();
+      for (const event of events) this.respond(event);
+    }, active => {
+      if (!active) { this.sessions.clear(); if (this.speech.current?.priority === 'low') this.dismissBubble(); }
+      if (this.state.awarenessActive !== active) { this.state.awarenessActive = active; this.publish(); }
+    }, () => app.getAppMetrics().map(metric => metric.pid));
+    this.events.on('CHARACTER_CLICKED', ({ count }) => this.react(count >= 5 ? 'angry' : 'startled', count >= 3 ? 'angry' : 'startled'));
+    this.events.on('CHARACTER_PICKED_UP', () => this.setAnimation('picked_up'));
+    this.events.on('CHARACTER_LANDED', () => this.react('landing', 'neutral', 430));
+    this.events.on('USER_BECAME_IDLE', () => {
+      this.context.idle(powerMonitor.getSystemIdleTime()); this.context.hover(false);
+      this.state.sleeping = true; this.body.walking = false; this.body.vx = 0; this.sessions.clear();
+      this.setAnimation('sleeping'); this.dismissBubble();
     });
-    this.events.on('CHARACTER_PICKED_UP', () => {
-      this.setAnimation('picked_up');
-      if (Math.random() < this.speechChance()) this.sayCategory('dragged', 'medium');
+    this.events.on('USER_RETURNED', () => {
+      this.state.sleeping = false; this.react('waking_up', 'happy', 900); this.respond(this.context.wake()); this.configureTimers();
     });
-    this.events.on('CHARACTER_LANDED', () => {
-      this.react('landing', 'neutral', 430);
-      if (Math.random() < this.speechChance() * 0.5) this.sayCategory('landing', 'low');
-    });
-    this.events.on('USER_BECAME_IDLE', () => { this.state.sleeping = true; this.body.walking = false; this.body.vx = 0; this.setAnimation('sleeping'); this.dismissBubble(); });
-    this.events.on('USER_RETURNED', () => { this.state.sleeping = false; this.react('waking_up', 'happy', 900); if (Math.random() < 0.5) this.sayCategory('greeting', 'low'); });
     window.once('ready-to-show', () => {
       this.ready = true; this.applyWindowSettings(); this.moveWindow();
       if (this.state.visible) window.showInactive();
       this.publish(); this.configureTimers(); this.events.emit('APP_STARTED', undefined);
       if (!this.store.value.firstLaunchDone) {
-        this.say('Hello. I live here now.', 'high'); this.store.update({ firstLaunchDone: true }); this.state.settings = this.store.value;
+        this.saySituation('first_launch'); this.store.update({ firstLaunchDone: true }); this.state.settings = this.store.value;
       }
       console.log('[ducky] Companion ready', this.windowOrigin());
     });
@@ -102,30 +118,54 @@ export class CompanionController {
     if (this.reactionTimer) clearTimeout(this.reactionTimer);
     this.state.emotion = emotion; this.setAnimation(animation, true);
     this.reactionTimer = setTimeout(() => {
-      this.reactionTimer = undefined; this.state.emotion = this.hovered ? 'suspicious' : 'neutral'; this.setAnimation(this.baseAnimation());
+      this.reactionTimer = undefined;
+      if (!this.speech.current) this.state.emotion = this.hovered ? 'suspicious' : 'neutral';
+      this.setAnimation(this.baseAnimation());
     }, duration);
   }
   animationComplete(animation: string): void { this.events.emit('ANIMATION_COMPLETED', { animation }); }
-  private speechChance(): number { return this.store.value.talkativeness === 'quiet' ? 0.12 : this.store.value.talkativeness === 'chatty' ? 0.65 : 0.35; }
-  private sayCategory(category: DialogueCategory, priority: Priority): void { this.say(this.dialogue.pick(category), priority); }
-  private say(text: string, priority: Priority): void {
+  private respond(event: SituationEvent | null): void { if (event) this.saySituation(event.situation, event.context); }
+  private saySituation(situation: Situation, context: DialogueContext = {}): void {
+    this.dialogue.decide(situation, { ...context, talkativeness: this.store.value.talkativeness, fullscreen: this.sessions.fullscreen }, speech => this.say(speech));
+  }
+  private say(line: DirectedSpeech): boolean {
     const area = nearestArea(this.body, workAreas());
     const tooHigh = this.windowOrigin().y <= area.y + 20;
-    if (!this.speech.offer(text, priority, { muted: this.store.value.mute,
+    if (!this.speech.offer(line.text, line.priority, { muted: this.store.value.mute, then: line.then, followUpDelayMs: 1500 + Math.random() * 1000,
+      fullscreen: this.sessions.fullscreen,
       blocked: !this.state.visible || this.state.paused || this.state.sleeping || tooHigh,
-      cooldownMs: this.store.value.talkativeness === 'quiet' ? 15000 : this.store.value.talkativeness === 'chatty' ? 2500 : 6500 })) return;
-    this.state.bubble = this.speech.current!.text; this.publish();
+      cooldownMs: this.store.value.talkativeness === 'quiet' ? 15000 : this.store.value.talkativeness === 'chatty' ? 2500 : 6500 })) return false;
+    this.react(line.animation, line.emotion, line.animation === 'landing' ? 430 : 900);
+    this.syncSpeech(); return true;
+  }
+  private syncSpeech(): void {
+    this.state.bubble = this.speech.current?.text ?? null; this.publish();
     if (this.bubbleTimer) clearTimeout(this.bubbleTimer);
-    this.bubbleTimer = setTimeout(() => this.dismissBubble(), this.speech.current!.expiresAt - Date.now());
+    this.bubbleTimer = undefined;
+    const next = this.speech.nextChangeAt;
+    if (next !== undefined) this.bubbleTimer = setTimeout(() => {
+      this.speech.tick();
+      if (!this.speech.current) this.dismissBubble(); else this.syncSpeech();
+    }, Math.max(1, next - Date.now()));
   }
   dismissBubble(): void {
     if (this.bubbleTimer) clearTimeout(this.bubbleTimer); this.bubbleTimer = undefined;
-    this.speech.dismiss(); this.state.bubble = null; this.publish();
+    this.speech.dismiss(); this.state.bubble = null;
+    if (!this.reactionTimer) this.state.emotion = this.hovered ? 'suspicious' : 'neutral';
+    this.publish();
   }
   hover(active: boolean): void {
     this.hovered = active;
-    if (this.state.paused || this.state.sleeping || this.state.dragging || this.reactionTimer) return;
-    this.events.emit('CHARACTER_HOVERED', { active }); this.state.emotion = active ? 'suspicious' : 'neutral'; this.publish();
+    if (this.hoverTimer) clearTimeout(this.hoverTimer); this.hoverTimer = undefined;
+    if (!active) this.context.hover(false);
+    if (this.state.paused || !this.state.visible || this.state.sleeping || this.state.dragging) return;
+    this.respond(this.context.hover(active));
+    if (active) this.hoverTimer = setTimeout(() => {
+      this.hoverTimer = undefined; for (const event of this.context.tick()) this.respond(event);
+    }, 2501);
+    this.events.emit('CHARACTER_HOVERED', { active });
+    if (!this.reactionTimer && !this.speech.current) this.state.emotion = active ? 'suspicious' : 'neutral';
+    this.publish();
   }
   setInteractive(interactive: boolean): void {
     if (!this.window.isDestroyed()) this.window.setIgnoreMouseEvents(!(interactive || !!this.grab), { forward: true });
@@ -135,6 +175,7 @@ export class CompanionController {
     const size = this.size();
     if (local.x < 0 || local.y < 0 || local.x > size.width || local.y > size.height) throw new Error('Invalid grab offset');
     const offset = { x: local.x - size.width / 2, y: local.y - size.height };
+    this.speech.interrupt(); this.dismissBubble();
     this.grab = { cursor: { x: this.body.x + offset.x, y: this.body.y + offset.y }, offset, moved: false };
     this.body.walking = false; this.body.vx = 0; this.body.vy = 0;
     if (!this.reactionTimer) this.setAnimation(this.baseAnimation());
@@ -145,8 +186,11 @@ export class CompanionController {
     if (!this.grab) return;
     let pickedUp = false;
     if (!this.grab.moved && Math.hypot(point.x - this.grab.cursor.x, point.y - this.grab.cursor.y) >= 4) {
+      // Pickup is the immediate reaction; still close the previous away session.
+      if (this.state.sleeping) this.context.wake();
       this.grab.moved = true; this.state.dragging = true; this.state.sleeping = false;
       this.cancelReaction(); this.cancelClicks(); pickedUp = true;
+      this.fall = undefined;
     }
     if (!this.grab.moved) return;
     const target = clampPosition({ x: point.x - this.grab.offset.x, y: point.y - this.grab.offset.y }, workAreas(), this.size());
@@ -154,14 +198,20 @@ export class CompanionController {
     this.velocity.add(target, Date.now()); this.moveWindow();
     if (pickedUp) {
       this.events.emit('CHARACTER_PICKED_UP', { x: this.body.x, y: this.body.y });
+      this.respond(this.context.pickup(point));
       console.log('[ducky] Drag started');
     }
+    this.respond(this.context.drag(point));
+    for (const event of this.context.tick()) this.respond(event);
   }
   endDrag(allowClick = true): void {
     if (!this.grab) return;
     this.dragSample(screen.getCursorScreenPoint());
     const moved = this.grab.moved; this.grab = undefined; this.state.dragging = false;
+    this.context.release();
     if (moved) {
+      this.speech.interrupt(); this.dismissBubble(); this.cancelReaction();
+      this.fall = { height: Math.max(0, groundY(nearestArea(this.body, workAreas())) - this.body.y), hitWall: false };
       const velocity = this.velocity.velocity(); this.body = release(this.body, velocity);
       this.events.emit('CHARACTER_DROPPED', { position: { x: this.body.x, y: this.body.y }, velocity });
       this.setAnimation('falling'); console.log('[ducky] Drag released', velocity);
@@ -171,21 +221,26 @@ export class CompanionController {
   }
   private queueClick(): void {
     if (this.clickTimer) clearTimeout(this.clickTimer);
-    this.pendingClicks++;
+    const event = this.context.click();
+    if (event && this.pendingClick?.situation !== 'click_angry') this.pendingClick = event;
     this.clickTimer = setTimeout(() => {
       this.clickTimer = undefined;
-      if (this.state.paused || !this.state.visible) { this.pendingClicks = 0; return; }
-      const now = Date.now(); this.clickTimes = this.clickTimes.filter(time => now - time < 4000);
-      for (let i = 0; i < this.pendingClicks; i++) this.clickTimes.push(now);
-      this.pendingClicks = 0;
+      const pending = this.pendingClick; this.pendingClick = null;
+      if (this.state.paused || !this.state.visible || !pending) return;
       if (this.state.sleeping) this.events.emit('USER_RETURNED', undefined);
-      this.events.emit('CHARACTER_CLICKED', { count: this.clickTimes.length });
+      this.events.emit('CHARACTER_CLICKED', { count: pending.context?.count ?? 1 });
+      this.respond(pending);
     }, 500);
   }
-  cancelClicks(): void { if (this.clickTimer) clearTimeout(this.clickTimer); this.clickTimer = undefined; this.pendingClicks = 0; }
+  cancelClicks(): void { if (this.clickTimer) clearTimeout(this.clickTimer); this.clickTimer = undefined; this.pendingClick = null; }
   private cancelReaction(): void { if (this.reactionTimer) clearTimeout(this.reactionTimer); this.reactionTimer = undefined; this.state.emotion = 'neutral'; }
   private configureTimers(): void {
     const active = this.ready && this.state.visible && !this.state.paused && !this.disposed;
+    this.awareness.configure(active && !this.state.sleeping && this.store.value.appAwareness);
+    if (!active) {
+      this.context.suspend(); this.hovered = false;
+      if (this.hoverTimer) clearTimeout(this.hoverTimer); this.hoverTimer = undefined;
+    }
     this.cursor.configure(active, !!this.grab);
     const needMotion = active && !this.grab && moving(this.body);
     if (needMotion && !this.motionTimer) {
@@ -200,19 +255,41 @@ export class CompanionController {
   private motionTick(): void {
     const now = performance.now(); const result = step(this.body, (now - this.lastMotion) / 1000, workAreas(), this.size(), this.store.value.reducedMotion || this.reducedMotion);
     this.lastMotion = now; this.body = result.body; this.moveWindow();
-    if (result.landed) { this.events.emit('CHARACTER_LANDED', { x: this.body.x, y: this.body.y }); console.log('[ducky] Landed; bounce', this.body.bounces); }
+    if (this.fall && result.hitWall) this.fall.hitWall = true;
     if (!this.reactionTimer) this.setAnimation(this.baseAnimation());
-    if (!moving(this.body)) { this.savePosition(); this.configureTimers(); console.log('[ducky] Motion settled'); }
+    if (!moving(this.body)) {
+      if (this.fall) {
+        const fall = this.fall; this.fall = undefined;
+        this.events.emit('CHARACTER_LANDED', { x: this.body.x, y: this.body.y });
+        this.saySituation(landingSituation(fall.height, fall.hitWall));
+      }
+      this.savePosition(); this.configureTimers(); console.log('[ducky] Motion settled');
+    }
   }
   private behaviourTick(): void {
     this.reducedMotion = systemPreferences.getAnimationSettings().prefersReducedMotion;
+    if (!this.state.sleeping) for (const event of this.context.tick()) this.respond(event);
+    this.ambientTick();
     const behaviour = this.scheduler.tick({ paused: this.state.paused, sleeping: this.state.sleeping,
-      walkingEnabled: this.store.value.walking, busy: !!this.grab || moving(this.body) || !!this.reactionTimer });
+      walkingEnabled: this.store.value.walking, busy: !!this.grab || moving(this.body) || !!this.reactionTimer || !!this.speech.current });
     if (!behaviour) return;
     if (behaviour === 'walk_left' || behaviour === 'walk_right') {
       this.body = walk(this.body, behaviour === 'walk_left' ? 'left' : 'right', this.scheduler.walkDistance());
       this.setAnimation('walking'); this.configureTimers();
+      this.saySituation('walk_mutter');
     } else this.setAnimation(behaviour);
+  }
+  private ambientTick(): void {
+    const now = Date.now();
+    const blocked = this.state.paused || !this.state.visible || this.state.sleeping || !!this.grab || this.sessions.fullscreen;
+    if (now >= this.nextThought) {
+      this.nextThought = now + thoughtDelay(this.store.value.talkativeness);
+      if (!blocked) this.saySituation(thoughtSituation(new Date(now)));
+    }
+    if (!blocked && new Date(now).getHours() < 4 && now >= this.nextLate && powerMonitor.getSystemIdleTime() < 60) {
+      this.nextLate = now + 45 * 60000;
+      this.saySituation(this.state.awarenessActive && this.sessions.current ? 'late_night_working' : 'sleepy_late');
+    }
   }
   checkIdle(): void {
     if (this.grab || this.state.paused || !this.state.visible) return;
@@ -242,6 +319,7 @@ export class CompanionController {
       console.log('[ducky] Launch at startup:', patch.launchAtStartup);
     }
     this.store.update(patch); this.state.settings = this.store.value;
+    if (patch.talkativeness) this.nextThought = Date.now() + thoughtDelay(patch.talkativeness);
     if (!this.store.value.walking && this.body.walking) { this.body.walking = false; this.body.vx = 0; this.setAnimation(this.baseAnimation()); }
     if (patch.mute && this.speech.current?.priority === 'low') this.dismissBubble();
     this.applyWindowSettings(); if (sizeChanged) this.recover('character size');
@@ -252,13 +330,15 @@ export class CompanionController {
   }
   recover(reason: string, reset = false): void {
     this.endDrag(false); this.cancelReaction();
+    this.fall = undefined;
     this.body = reset ? resetPosition(primaryArea(), this.size()) : recover(this.body, workAreas(), this.size());
     this.moveWindow(); this.savePosition(); this.setAnimation(this.state.paused ? 'idle' : this.baseAnimation());
     this.configureTimers(); this.publish(); console.log('[ducky] Position recovered:', reason, this.windowOrigin());
   }
   resume(): void { this.events.emit('APP_RESUMED', undefined); this.recover('system resume'); this.checkIdle(); }
   dispose(): void {
-    this.disposed = true; this.cursor.stop();
+    this.disposed = true; this.cursor.stop(); this.awareness.dispose(); this.context.suspend();
+    if (this.hoverTimer) clearTimeout(this.hoverTimer);
     if (this.motionTimer) clearInterval(this.motionTimer);
     if (this.behaviourTimer) clearInterval(this.behaviourTimer);
     if (this.idleTimer) clearInterval(this.idleTimer);

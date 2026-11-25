@@ -79,14 +79,16 @@ export function walk(body: Body, direction: Direction, distance: number): Body {
 }
 export function moving(body: Body): boolean { return !body.grounded || body.walking || Math.abs(body.vx) > 1; }
 
-export function step(body: Body, elapsed: number, areas: WorkArea[], size: Size, reducedMotion = false): { body: Body; landed: boolean } {
+export function step(body: Body, elapsed: number, areas: WorkArea[], size: Size, reducedMotion = false): { body: Body; landed: boolean; hitWall: boolean } {
   const next = { ...body }; const dt = clamp(elapsed, 0, 0.04);
   const area = body.walking ? corridor(nearestArea(body, areas), areas) : flightCorridor(body, areas, size);
   const minX = area.x + size.width / 2; const maxX = area.x + area.width - size.width / 2;
   let landed = false;
+  let hitWall = false;
   const travel = next.walking ? Math.sign(next.vx) * Math.min(Math.abs(next.vx * dt), next.walkRemaining) : next.vx * dt;
   next.x += travel;
   if (next.x < minX || next.x > maxX) {
+    hitWall = !next.walking && !next.grounded;
     next.x = clamp(next.x, minX, maxX);
     next.vx = next.x <= minX ? Math.abs(next.vx) : -Math.abs(next.vx);
     if (!next.walking) next.vx *= 0.55;
@@ -125,7 +127,7 @@ export function step(body: Body, elapsed: number, areas: WorkArea[], size: Size,
     next.vx *= Math.exp(-(next.grounded ? 9 : 0.8) * dt);
     if (Math.abs(next.vx) < 1) next.vx = 0;
   }
-  return { body: next, landed };
+  return { body: next, landed, hitWall };
 }
 
 export class VelocityHistory {

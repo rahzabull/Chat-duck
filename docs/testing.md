@@ -1,4 +1,45 @@
-# Milestone 1 testing
+# Testing
+
+## Curated personality and optional app awareness
+
+Current automated result: **145 passed**, with two native Windows checks skipped
+by default. `npm run typecheck` and `npm run build` pass. The two native checks
+were explicitly enabled and passed separately on Windows.
+
+Default tests do not read the actual foreground application. They cover seeded
+dialogue selection, last-twelve exclusion, shuffled bags, templates, cooldowns,
+interaction context, two-beat interruption, mapping/exclusions, session thresholds,
+fullscreen suppression, process lifecycle/retry, settings opt-in, and controller
+wiring using mocked Electron. Existing physics/settings/IPC tests remain included.
+
+To explicitly opt into native helper verification (samples are discarded, never
+printed or persisted):
+
+```powershell
+$env:DUCKY_NATIVE_HELPER_TEST = '1'
+try { npm test -- tests/awareness-native.test.ts }
+finally { Remove-Item Env:\DUCKY_NATIVE_HELPER_TEST }
+```
+
+These checks spawn owned hidden helpers, verify samples three seconds apart,
+verify their PID disappears on disable, and verify parent exit leaves no helper.
+They do not launch the full Electron GUI or establish idle CPU performance.
+
+Additional desktop acceptance for this revision:
+
+- [ ] Hover briefly, linger over 2.5 seconds, and revisit three times in a minute.
+- [ ] Click five times within four seconds; wait twenty seconds for possible forgiveness.
+- [ ] Pick up three times in two minutes; hold over four seconds; shake rapidly.
+- [ ] Drop from above 500 DIP and throw into an exterior wall; speak once after settling.
+- [ ] Verify two beats share one bubble, talking continues, and a new click/drag cancels the second beat.
+- [ ] Check short/long away greetings, time-of-day thoughts, and talkativeness.
+- [ ] Enable Privacy > app awareness, confirm the active indicator, and switch app categories.
+- [ ] Confirm private apps do not receive comments and clear the previous app bubble.
+- [ ] Check fullscreen suppression across monitors/DPI while awareness is enabled.
+- [ ] Disable, pause, hide, and quit; confirm the owned PowerShell helper exits each time.
+- [ ] Re-measure full-app idle CPU with awareness off and on after helper startup.
+
+## Historical Milestone 1 testing
 
 Automated checks use Vitest in Node without launching Electron. Cursor tests mock
 Electron's screen API and use fake timers to check 4/20/60 Hz sampling, duplicate

@@ -11,12 +11,14 @@ export interface Settings {
   idleToSleepMinutes: number;
   reducedMotion: boolean;
   mute: boolean;
+  appAwareness: boolean;
   firstLaunchDone: boolean;
   position: Point | null;
 }
 export type EditableSettings = Omit<Settings, 'firstLaunchDone' | 'position'>;
 export interface CompanionState {
   visible: boolean; paused: boolean; sleeping: boolean; dragging: boolean;
+  awarenessActive: boolean;
   animation: string; animationRevision: number; emotion: string; direction: Direction; movementSpeed: number;
   bubble: string | null; settings: Settings; debugHitbox: boolean; version: string;
 }

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, isSettingsPatch, parseSettings } from '../src/shared/schemas/settings';
 describe('settings schema', () => {
+  it('defaults app awareness off and accepts only an explicit boolean opt-in', () => {
+    expect(parseSettings({}).appAwareness).toBe(false);
+    expect(parseSettings({ appAwareness: true }).appAwareness).toBe(true);
+    expect(parseSettings({ appAwareness: 'true' }).appAwareness).toBe(false);
+    expect(isSettingsPatch({ appAwareness: true })).toBe(true);
+    expect(isSettingsPatch({ appAwareness: 1 })).toBe(false);
+  });
   it.each([null, undefined, false, 'garbage', [], 12])('turns invalid input into defaults: %j', value => {
     expect(parseSettings(value)).toEqual(DEFAULT_SETTINGS);
   });

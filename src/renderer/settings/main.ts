@@ -18,7 +18,7 @@ function SettingsApp() {
   function command(value: Command): void { void window.ducky.command(value).catch(() => setError('That action could not be completed.')); }
   if (!state) return h('p', { role: 'status' }, error || 'Waking up the settings…');
   const settings = state.settings;
-  function check(key: 'alwaysOnTop' | 'desktopOnly' | 'launchAtStartup' | 'walking' | 'reducedMotion' | 'mute', label: string) {
+  function check(key: 'alwaysOnTop' | 'desktopOnly' | 'launchAtStartup' | 'walking' | 'reducedMotion' | 'mute' | 'appAwareness', label: string) {
     return h('label', { className: 'check', key },
       h('input', { type: 'checkbox', checked: settings[key], onChange: (event: ChangeEvent<HTMLInputElement>) => save({ [key]: event.target.checked }) }), label);
   }
@@ -45,10 +45,14 @@ function SettingsApp() {
           const value = Number(event.target.value); if (value >= 1 && value <= 120) save({ idleToSleepMinutes: value });
         } }), check('reducedMotion', 'Reduce motion'),
       h('p', { className: 'hint' }, 'Your system’s reduced-motion preference is also respected.')),
+    h('section', { 'aria-labelledby': 'privacy' }, h('h2', { id: 'privacy' }, 'Privacy'),
+      check('appAwareness', 'Let Ducky notice which app is in front'),
+      h('p', { className: 'hint' }, "Ducky checks the name of the app in front every few seconds (like 'Chrome' or 'Figma') so he can comment on it. He never reads window titles, web pages, or screen contents, and nothing is stored or sent anywhere. Some apps are always ignored (password managers, banking, messaging)."),
+      h('p', { role: 'status', className: 'hint' }, state.awarenessActive ? '● App awareness active' : settings.appAwareness ? 'App awareness waiting or paused' : 'App awareness off')),
     h('section', { 'aria-labelledby': 'audio' }, h('h2', { id: 'audio' }, 'Audio'),
-      check('mute', 'Mute'), h('p', { className: 'hint' }, 'Sound is not implemented in Milestone 1. Mute suppresses low-priority speech bubbles; direct interactions can still receive a reply.')),
+      check('mute', 'Mute'), h('p', { className: 'hint' }, 'Sound is not implemented. Mute suppresses low-priority speech bubbles; direct interactions can still receive a reply.')),
     h('section', { 'aria-labelledby': 'about' }, h('h2', { id: 'about' }, 'About'),
-      h('p', null, `Ducky.exe ${state.version} · Milestone 1 prototype`), h('p', null, 'Made by Ente'),
+      h('p', null, `Ducky.exe ${state.version} · Curated companion prototype`), h('p', null, 'Made by Ente'),
       h('p', null, 'Local only. No telemetry. No network access in this build.')),
     h('footer', null,
       h('button', { type: 'button', onClick: () => command(state.visible ? 'hide' : 'show') }, state.visible ? 'Hide Ducky' : 'Show Ducky'),

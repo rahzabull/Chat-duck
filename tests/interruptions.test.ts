@@ -6,8 +6,32 @@ describe('speech queue', () => {
     let now = 0; const queue = new SpeechQueue(() => now);
     expect(queue.offer('Hello', 'medium', options)).toBe(true);
     expect(queue.offer('Dropped', 'low', options)).toBe(false);
-    expect(queue.offer('Also dropped', 'high', options)).toBe(false);
+    expect(queue.offer('Also dropped', 'medium', options)).toBe(false);
     expect(queue.current?.text).toBe('Hello'); now = 3000; expect(queue.tick()).toBe(true); expect(queue.current).toBeNull();
+  });
+  it('replaces the first beat in the same bubble after the supplied pause', () => {
+    let now = 0; const queue = new SpeechQueue(() => now);
+    queue.offer('Hello', 'low', { ...options, then: 'x'.repeat(100), followUpDelayMs: 1800 });
+    now = 1799; expect(queue.tick()).toBe(false); expect(queue.current?.text).toBe('Hello');
+    now = 1800; expect(queue.tick()).toBe(true); expect(queue.current?.text).toBe('x'.repeat(100));
+    expect(queue.current?.expiresAt).toBe(8300);
+    now = 8300; queue.tick(); expect(queue.current).toBeNull();
+  });
+  it('drops follow-ups on a user interruption, dismissal or higher priority line', () => {
+    for (const action of ['interrupt', 'dismiss', 'preempt'] as const) {
+      let now = 0; const queue = new SpeechQueue(() => now);
+      queue.offer('Hello', 'low', { ...options, then: 'Stale' });
+      now = 1000;
+      if (action === 'preempt') expect(queue.offer('Urgent', 'high', options)).toBe(true);
+      else queue[action]();
+      now = 2000; queue.tick(); expect(queue.current?.text).not.toBe('Stale');
+      expect(queue.current?.text).toBe(action === 'preempt' ? 'Urgent' : undefined);
+    }
+  });
+  it('rejects low and medium speech in fullscreen, including follow-ups', () => {
+    const queue = new SpeechQueue(() => 0);
+    for (const priority of ['low', 'medium'] as const) expect(queue.offer('No', priority, { ...options, fullscreen: true, then: 'No either' })).toBe(false);
+    expect(queue.offer('Yes', 'high', { ...options, fullscreen: true })).toBe(true);
   });
   it('honours cooldown, minimum duration, and longer text duration', () => {
     let now = 0; const queue = new SpeechQueue(() => now);

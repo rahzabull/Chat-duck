@@ -1,0 +1,272 @@
+/**
+ * Ducky's hand-written voice (non-AI fallback dialogue).
+ *
+ * Voice guide, so new lines stay in character:
+ * - He talks like a person muttering to a friend, not like software. Contractions, short sentences,
+ *   half-finished thoughts, the odd "wait" or "okay". No exclamation-mark enthusiasm, no "As a duck...".
+ * - Unemployed, a bit paranoid, sarcastic but fond of you. Overconfident about things he knows nothing about.
+ * - He reacts to what actually happened (how long you hovered, how many times you grabbed him, how far he fell,
+ *   what time it is, which app is in front if you allowed that). Never invent things he cannot know,
+ *   e.g. which website you are on or what is on screen. He only ever knows the app's name.
+ * - Silence is fine. Most events should not produce a line.
+ *
+ * Template slots: {app} app display name, {minutes}, {hours}, {count}, {timeAway} (e.g. "twenty minutes").
+ * `then` is an optional follow-up shown as a second bubble 1.5-2.5 s later (a natural beat).
+ */
+export interface Line {
+  text: string;
+  then?: string;
+  weight?: number;
+}
+
+export type Situation =
+  | 'first_launch'
+  | 'hover' | 'hover_linger' | 'hover_again'
+  | 'click' | 'click_escalate' | 'click_angry' | 'click_forgive'
+  | 'pickup' | 'pickup_again' | 'drag_long' | 'drag_shaken'
+  | 'drop_small' | 'drop_big' | 'thrown_wall'
+  | 'wake_short' | 'wake_long'
+  | 'sleepy_late'
+  | 'walk_mutter'
+  | 'thought' | 'thought_morning' | 'thought_late'
+  | 'app_browser' | 'app_browser_long' | 'app_code' | 'app_code_long' | 'app_design' | 'app_design_long'
+  | 'app_video_edit' | 'app_3d' | 'app_ai' | 'app_office' | 'app_files' | 'app_terminal' | 'app_music'
+  | 'app_switching' | 'app_generic_long' | 'late_night_working';
+
+export const LINES: Record<Situation, Line[]> = {
+  first_launch: [
+    { text: 'Hello. I live here now.', then: 'Don\'t mind me. I\'ll be down here, judging quietly.' },
+  ],
+
+  hover: [
+    { text: 'Hm?' },
+    { text: 'Can I help you?' },
+    { text: 'You\'re hovering.' },
+    { text: 'I see you.' },
+    { text: 'Oh. Hi.' },
+    { text: 'That\'s a cursor. Near my face.' },
+    { text: 'Yes, it\'s me. The duck.' },
+    { text: 'Careful. I bite. Emotionally.' },
+  ],
+  hover_linger: [
+    { text: 'Okay, this is getting weird.' },
+    { text: 'You\'ve been staring for a while now.', then: 'I\'m flattered. And a little scared.' },
+    { text: 'Are you going to say something or just... loom?' },
+    { text: 'Is there something on my face?', then: 'It\'s the hat, isn\'t it.' },
+    { text: 'I can feel you thinking about poking me.' },
+    { text: 'Blink twice if you need help.' },
+  ],
+  hover_again: [
+    { text: 'You keep coming back. I get it, I\'m charming.' },
+    { text: 'Back again? People will talk.' },
+    { text: 'This is, what, visit number {count}?' },
+    { text: 'Do you need a hug or something? I don\'t do hugs.', then: 'Okay, maybe a small one.' },
+  ],
+
+  click: [
+    { text: 'Ow. Rude.' },
+    { text: 'Yes?' },
+    { text: 'Hey. Hi. What.' },
+    { text: 'That was my stomach.' },
+    { text: 'Quack. There, happy?' },
+    { text: 'You could just say hello, you know.' },
+    { text: 'I was in the middle of something.', then: 'Not really. But still.' },
+    { text: 'Boop received.' },
+  ],
+  click_escalate: [
+    { text: 'Okay, I felt that one.' },
+    { text: 'Again? Really?' },
+    { text: 'That\'s {count}. I\'m counting.' },
+    { text: 'Do I look like a button to you?' },
+    { text: 'Please stop poking the duck.' },
+    { text: 'Every click is going in my diary.' },
+  ],
+  click_angry: [
+    { text: 'RIGHT. That\'s it.', then: 'I\'m filing a complaint. With myself. I\'m very upset.' },
+    { text: 'I am this close to biting your cursor.' },
+    { text: 'Personal space is a duck right!' },
+    { text: 'Do you poke everyone like this, or is it just me?' },
+    { text: 'I\'m going to remember this. Ducks never forget.', then: 'That might be elephants.' },
+    { text: 'You know what, I don\'t even like bread that much.', then: 'That was a lie. I just wanted you to feel bad.' },
+  ],
+  click_forgive: [
+    { text: 'Fine. I forgive you.', then: 'Mostly.' },
+    { text: 'Okay, we\'re good. Don\'t make it weird.' },
+    { text: 'I\'ve calmed down. I did some breathing.' },
+  ],
+
+  pickup: [
+    { text: 'Whoa, whoa, whoa!' },
+    { text: 'Put me down!' },
+    { text: 'I didn\'t agree to this!' },
+    { text: 'Hey! Hands off the duck!' },
+    { text: 'Where are we going?' },
+    { text: 'Okay, okay, I\'m coming.' },
+    { text: 'Not the hat. Mind the hat.' },
+    { text: 'This is kidnapping.' },
+  ],
+  pickup_again: [
+    { text: 'Again?! I just got comfortable.' },
+    { text: 'You really like moving me around, huh.' },
+    { text: 'I\'m not a desk ornament!', then: 'Okay, I\'m a little bit of a desk ornament.' },
+    { text: 'That\'s {count} times now. Pick a spot.' },
+  ],
+  drag_long: [
+    { text: 'Are we... going somewhere specific?' },
+    { text: 'My feet don\'t touch anything. I hate this.' },
+    { text: 'I\'m getting a little motion sick.' },
+    { text: 'You can put me down any time now.' },
+    { text: 'Is this a tour? Is there a gift shop?' },
+  ],
+  drag_shaken: [
+    { text: 'STOP SHAKING ME!' },
+    { text: 'I can see my whole life flashing before my eyes!' },
+    { text: 'My brain is doing laps in there!' },
+    { text: 'I\'m not a snow globe!' },
+  ],
+  drop_small: [
+    { text: 'Oof.' },
+    { text: 'Okay. Floor. Good.' },
+    { text: 'I meant to do that.' },
+    { text: 'Nailed it.' },
+    { text: 'Gentle. Thank you. Finally.' },
+  ],
+  drop_big: [
+    { text: 'OW. My everything.' },
+    { text: 'That was a long way down!', then: 'I saw my ancestors.' },
+    { text: 'Gravity is so rude.' },
+    { text: 'Ten out of ten landing. Ignore the screaming.' },
+    { text: 'I\'m fine. I\'m fine.', then: 'I\'m not fine.' },
+    { text: 'Can ducks get concussions? Asking for me.' },
+  ],
+  thrown_wall: [
+    { text: 'You threw me. You actually threw me.' },
+    { text: 'Who taught you to throw like that?' },
+    { text: 'I hit the edge of the screen. The EDGE.' },
+  ],
+
+  wake_short: [
+    { text: 'Oh, you\'re back.' },
+    { text: 'Hey. I was resting my eyes.' },
+    { text: 'I wasn\'t asleep. I was thinking. With my eyes closed.' },
+    { text: 'Mm. What did I miss?' },
+  ],
+  wake_long: [
+    { text: 'Oh! Hey. You were gone for {timeAway}.', then: 'Not that I was counting.' },
+    { text: 'You\'re back! I thought you\'d left me.', then: 'I was about to start selling your stuff.' },
+    { text: 'Welcome back. I guarded the desktop. Nobody came.' },
+    { text: 'I had the weirdest dream. You were a sandwich.' },
+  ],
+  sleepy_late: [
+    { text: 'It\'s really late, you know.' },
+    { text: '*yawn* Are we still doing this?' },
+    { text: 'Normal people are asleep right now. Just saying.' },
+  ],
+
+  walk_mutter: [
+    { text: 'Just stretching my legs.' },
+    { text: 'Going for a walk. Don\'t wait up.' },
+    { text: 'Patrolling.' },
+    { text: 'Left foot, right foot, left foot...' },
+  ],
+
+  thought: [
+    { text: 'Do you ever think about how bread is just... soft toast?' },
+    { text: 'I\'ve been thinking.', then: 'Do ducks know they\'re ducks?' },
+    { text: 'I think I\'d be good at podcasting. I have opinions.' },
+    { text: 'What if pigeons are just ducks who gave up?' },
+    { text: 'Random thought: I\'ve never seen my own feet from above.' },
+    { text: 'I want a boat. Not a big one. Duck-sized.' },
+    { text: 'If I had a job, I\'d be on lunch break right now.' },
+    { text: 'Do you think the moon gets lonely?' },
+    { text: 'I\'m starting a band. You\'re not in it.' },
+    { text: 'You know what this desktop needs? More ducks.', then: 'Just one more. For balance.' },
+    { text: 'I just remembered something embarrassing from 2019.' },
+    { text: 'Hey.', then: 'Nothing. Just checking you\'re still there.' },
+    { text: 'I support your questionable decisions. Just so you know.' },
+    { text: 'I\'ve decided to be mysterious from now on.', then: '...' },
+  ],
+  thought_morning: [
+    { text: 'Morning. Did you eat something? Not bread. Leave the bread.' },
+    { text: 'It\'s too early for anything. Even for me, and I do nothing.' },
+  ],
+  thought_late: [
+    { text: 'It\'s past midnight. Everything feels philosophical now.' },
+    { text: 'Late-night thought: what if the hat is wearing me?' },
+  ],
+
+  // App awareness. He only knows the app's name, never what is inside it.
+  app_browser: [
+    { text: 'Ooh, {app}. Where are we going?' },
+    { text: 'Browsing, huh. Find anything good?' },
+    { text: 'Off into the internet again. Bring me back something.' },
+    { text: 'Internet time. Don\'t believe everything you read.', then: 'Except things I say.' },
+    { text: 'Ah, {app}. The place where minutes go to die.' },
+  ],
+  app_browser_long: [
+    { text: 'You\'ve been on the internet for {minutes} minutes.', then: 'Just one more tab, right?' },
+    { text: '{minutes} minutes in {app}. Is the internet finished yet?' },
+    { text: 'Still browsing? I\'d make a joke about tabs, but I can\'t see them.', then: 'I can feel them though.' },
+    { text: 'You\'ve been in {app} so long I forgot what your face looks like.' },
+  ],
+  app_code: [
+    { text: 'Oh, we\'re coding. I\'ll be quiet.', then: 'Mostly.' },
+    { text: 'Coding time. Want me to stare at the bugs with you?' },
+    { text: 'Ah, {app}. Where semicolons go missing.' },
+  ],
+  app_code_long: [
+    { text: '{minutes} minutes of code. Have you tried turning it off and on again?' },
+    { text: 'You\'ve been in {app} a while. Drink some water. Bugs can wait.' },
+  ],
+  app_design: [
+    { text: 'Ooh, {app}. Make something pretty.' },
+    { text: 'Design time. Put a duck in it. Trust me.' },
+    { text: '{app}, huh. Are we pushing rectangles around again?' },
+  ],
+  app_design_long: [
+    { text: '{minutes} minutes in {app}. The rectangle\'s perfect. I promise.' },
+    { text: 'What if you moved it two pixels to the left?', then: 'Kidding. Please don\'t.' },
+  ],
+  app_video_edit: [
+    { text: 'Video editing. Is it rendering? It\'s always rendering.' },
+    { text: 'Ooh, {app}. Am I in this one?' },
+  ],
+  app_3d: [
+    { text: 'Blender, huh. Are you making a 3D duck? Be honest.' },
+    { text: 'If that\'s a donut tutorial, I want a bite.' },
+  ],
+  app_ai: [
+    { text: 'Talking to another AI? I\'m right here, you know.' },
+    { text: '{app}, huh. Is it smarter than me?', then: 'Don\'t answer that.' },
+    { text: 'Ask it if ducks are cool. I\'ll wait.' },
+  ],
+  app_office: [
+    { text: 'Ooh, serious work. I\'ll look busy too.' },
+    { text: 'Spreadsheets? Documents? Either way, I\'m proud of you.' },
+  ],
+  app_files: [
+    { text: 'Looking for something? I didn\'t move it. Probably.' },
+    { text: 'File hunting. Check the Downloads folder. It\'s always the Downloads folder.' },
+  ],
+  app_terminal: [
+    { text: 'Ooh, the hacker window.' },
+    { text: 'Typing commands. Very cool. Very scary.' },
+  ],
+  app_music: [
+    { text: 'Ooh, music. Play something I can dance to.' },
+    { text: 'Is this your sad playlist? Be honest.' },
+  ],
+  app_switching: [
+    { text: 'You\'re switching apps a lot. Everything okay?' },
+    { text: 'Your attention span and I have a lot in common.' },
+    { text: 'Okay, which one are we doing? I can\'t keep up.' },
+  ],
+  app_generic_long: [
+    { text: '{minutes} minutes in {app}. Stretch your legs. I\'ll watch your stuff.' },
+    { text: 'You\'ve been in {app} for a while. Blink, maybe?' },
+  ],
+  late_night_working: [
+    { text: 'It\'s {time}. Even I have better work-life balance, and I\'m unemployed.' },
+    { text: 'Still working at {time}? Go to bed. I\'ll keep the screen warm.' },
+  ],
+};

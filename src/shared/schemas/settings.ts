@@ -3,7 +3,7 @@ import type { EditableSettings, Settings } from '../types';
 export const DEFAULT_SETTINGS: Settings = {
   alwaysOnTop: true, desktopOnly: false, characterSize: 1, launchAtStartup: false,
   walking: true, talkativeness: 'normal', idleToSleepMinutes: 5, reducedMotion: false,
-  mute: false, firstLaunchDone: false, position: null,
+  mute: false, appAwareness: false, firstLaunchDone: false, position: null,
 };
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -11,7 +11,7 @@ export const finite = (value: unknown): value is number => typeof value === 'num
 export const isPoint = (value: unknown): value is { x: number; y: number } =>
   isRecord(value) && Object.keys(value).length === 2 && finite(value.x) && finite(value.y) &&
   Math.abs(value.x) <= 1000000 && Math.abs(value.y) <= 1000000;
-const booleanKeys = ['alwaysOnTop', 'desktopOnly', 'launchAtStartup', 'walking', 'reducedMotion', 'mute'] as const;
+const booleanKeys = ['alwaysOnTop', 'desktopOnly', 'launchAtStartup', 'walking', 'reducedMotion', 'mute', 'appAwareness'] as const;
 
 /** Tolerant disk boundary: invalid fields fall back independently. */
 export function parseSettings(value: unknown): Settings {
