@@ -10,7 +10,9 @@
 .duck .closed-eyes, .duck .zzz { opacity: 0; }
 .duck .eyes { transform-origin: 160px 199px; }
 .duck .brows { opacity: 0; }
-.duck .wing { transform-box: fill-box; transform-origin: center top; }
+.duck .wing { transform-box: view-box; }
+.duck .wing-left { transform-origin: 113px 230px; }
+.duck .wing-right { transform-origin: 201px 230px; }
 .duck .foot { transform-box: fill-box; transform-origin: center; }
 .duck[data-emotion="suspicious"] .brows, .duck[data-emotion="curious"] .brows { opacity: 1; transform: translateY(-3px); }
 .duck[data-emotion="suspicious"] .brow-left { transform: rotate(8deg); transform-origin: 144px 180px; }
@@ -80,3 +82,30 @@
 @keyframes look-around { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 65% { transform: translateX(5px); } }
 @keyframes nibble { 50% { transform: translate(-3px,-2px); } }
 @keyframes visit { 0%,100% { transform: translateX(-90px); opacity: 0; } 10% { opacity: 1; } 35%,65% { transform: translateX(12px); opacity: 1; } 90% { opacity: 1; } }
+
+/* Conversation poses use shoulder pivots. Loops exist only while actively conversing. */
+.duck[data-conversation] .head { transform-origin: 159px 230px; }
+.duck[data-conversation="listening"] .head { animation: conversation-nod 4s ease-in-out infinite; }
+.duck[data-conversation="listening"] .eyes { transform: scaleY(1.06); }
+.duck[data-conversation="thinking"] .head { transform: rotate(-6deg) translateY(-3px); }
+.duck[data-conversation="thinking"] .wing-right { transform: rotate(-145deg); animation: scratch 3s ease-in-out infinite; }
+.duck[data-conversation="thinking"] .pupil { transform: translateY(-4px); }
+.duck[data-conversation="responding"] .wing-right { animation: conversation-gesture 1.2s ease-in-out 4; }
+.duck[data-conversation="explaining"] .wing-right { animation: explanation 1.1s ease-in-out 6; }
+.duck[data-conversation="explaining"] .wing-left { animation: explanation 1.3s ease-in-out 5 reverse; }
+.duck[data-conversation="confused"] .head { transform: rotate(14deg); }
+.duck[data-conversation="amused"] .eyes { transform: scaleY(.35); }
+.duck[data-conversation="amused"] .body-motion { animation: duck-laugh .35s ease-in-out 4; }
+.duck[data-conversation="sarcastic"] .eyes { transform: scaleY(.65); }
+.duck[data-conversation="sarcastic"] .brows { opacity: 1; transform: rotate(-5deg); transform-origin: 160px 180px; }
+.duck[data-conversation="unsure"] .wing-left { transform: rotate(65deg); }
+.duck[data-conversation="unsure"] .wing-right { transform: rotate(-65deg); }
+.duck[data-conversation="interrupted"] .body-motion { animation: conversation-interrupt .3s ease-out; }
+.duck[data-conversation="conversation_end"] .head { animation: conversation-finish .3s ease-out; }
+@keyframes conversation-nod { 0%,85%,100% { transform: rotate(3deg); } 92% { transform: rotate(3deg) translateY(3px); } }
+@keyframes scratch { 0%,100% { transform: rotate(-145deg); } 50% { transform: rotate(-130deg); } }
+@keyframes conversation-gesture { 50% { transform: rotate(-25deg); } }
+@keyframes explanation { 50% { transform: rotate(-65deg); } }
+@keyframes duck-laugh { 50% { transform: translateY(-5px) scaleY(.97); } }
+@keyframes conversation-interrupt { 40% { transform: rotate(-5deg); } }
+@keyframes conversation-finish { from { transform: rotate(5deg); } to { transform: rotate(0); } }

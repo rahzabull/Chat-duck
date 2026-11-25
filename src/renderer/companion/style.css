@@ -8,3 +8,17 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
 .reduced #bubble { animation: none; }
 @media (prefers-reduced-motion: reduce) { #bubble { animation: none; } }
 @keyframes pop { from { opacity: 0; transform: translate(-50%, 4px); } }
+
+#talk-input { position: absolute; left: var(--response-left); bottom: max(4px, calc(var(--response-bottom) - 84px)); width: var(--response-width); height: 34px; max-height: 76px; resize: none; border: 1px solid #68866c; border-radius: 12px; background: #fffef3; color: #29382c; padding: 7px 10px; font: 14px/20px "Segoe UI", sans-serif; user-select: text; outline-offset: -3px; transition: opacity .18s; }
+#talk-input.ending { opacity: 0; pointer-events: none; }
+.conversing #bubble { white-space: pre-line; left: var(--response-left); bottom: var(--response-bottom); transform: none; max-width: var(--response-width); max-height: var(--response-height); border-radius: 16px; padding: 10px 13px; font-size: 14px; animation: none; }
+#reading-panel { position: absolute; left: var(--response-left); bottom: var(--response-bottom); width: var(--response-width); max-width: 420px; max-height: min(360px, var(--response-height)); background: #fffef3; color: #29382c; border: 1px solid #aabda5; border-radius: 14px; box-shadow: 0 3px 8px #0002; padding: 10px; font: 14px/1.45 "Segoe UI", sans-serif; user-select: text; }
+.reading-controls { display: flex; gap: 6px; margin-bottom: 6px; }
+.reading-controls button { border: 1px solid #c4d1bc; border-radius: 6px; padding: 4px 8px; background: #f0f4e7; color: inherit; cursor: pointer; }
+.reading-content { max-height: min(140px, calc(var(--response-height) - 58px)); overflow: auto; overflow-wrap: anywhere; }
+#reading-panel.expanded .reading-content { max-height: min(302px, calc(var(--response-height) - 58px)); }
+.reading-content p { margin: 0 0 9px; } .reading-content ul, .reading-content ol { padding-left: 22px; }
+.reading-content pre { white-space: pre-wrap; padding: 8px; background: #eaf0e4; border-radius: 6px; }
+.reading-content code { background: #eaf0e4; font-size: 12px; }
+#reading-panel[hidden], #talk-input[hidden] { display: none; }
+.reduced #talk-input { transition: none; }

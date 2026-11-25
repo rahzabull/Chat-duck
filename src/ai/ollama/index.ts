@@ -73,9 +73,9 @@ export class OllamaProvider implements AIProvider {
     if (!localModel(request.model)) throw new OllamaError('Model missing');
     const data = await this.request('/api/chat', {
       model: request.model, messages: request.messages, stream: false, think: false,
-      format: RESPONSE_SCHEMA, keep_alive: '10m',
-      options: { temperature: 0.9, top_p: 0.95, num_predict: 80, repeat_penalty: 1.15 },
-    }, signal, request.warmup ? 60000 : 2500);
+      format: request.format ?? RESPONSE_SCHEMA, keep_alive: '10m',
+      options: { temperature: request.conversation ? 0.8 : 0.9, top_p: 0.95, num_predict: request.summary ? 200 : request.conversation ? 700 : 80, repeat_penalty: 1.15 },
+    }, signal, request.conversation ? 45000 : request.warmup ? 60000 : 2500);
     if (!isRecord(data) || !isRecord(data.message) || typeof data.message.content !== 'string') throw new OllamaError('Bad response');
     return data.message.content;
   }

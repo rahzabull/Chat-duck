@@ -321,3 +321,14 @@ export const LINES: Record<Situation, Line[]> = {
   memory_anniversary: [{"text":"{count} days together. Still no job."},{"text":"Day {count}. The hat remains professional."},{"text":"{count} days. Pretty good tenancy."}],
   memory_name: [{"text":"Oh, hi, {name}."},{"text":"Morning, {name}. Depending on the morning."},{"text":"Hey, {name}. Hat's still here."}],
 };
+
+
+/** Conversation lines do not enter the ambient situation/cooldown director. */
+export const TALK_LINES = {
+  talk_huh: ["Say that again?", "That was mostly keyboard.", "A few more words? Small duck, limited clues.", "Didn't quite catch that. Try me again?"],
+  talk_greeting: ["I'm listening. Hat and all.", "Alright. What's on your mind?", "You rang? I've cleared my very busy schedule."],
+  talk_signoff: ["Alright. Back to duck business.", "I'll be here. Doing absolutely vital nothing.", "Catch you in a bit."],
+  talk_still_thinking: ["Still thinking. Small hat, big question.", "Give me a moment. The gears are turning."],
+  talk_error: ["That thought got tangled. Try me again?", "Couldn't get a proper answer just then. I won't make one up."],
+  talk_offline: ["My brain's offline right now. I can still remember things for you.", "Ollama isn't answering. My notebook still works, though.", "The thinking department is closed. Remembering and forgetting are still open.", "Can't answer that properly while my brain's offline. Ask me to remember something?", "No local brain connection. I'm still here, just less encyclopedic.", "I'd rather admit I'm offline than invent an answer. I can still show your memories."],
+} as const;

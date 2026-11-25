@@ -1,3 +1,5 @@
+import { conversationLayout } from '../../core/conversation/layout';
+import type { ConversationView } from '../../core/conversation/types';
 import { app, BrowserWindow, powerMonitor, screen, systemPreferences } from 'electron';
 import { MemoryStore } from '../memory/store';
 import { freshMemory, memorySummary, remember, visit, type Memory } from '../../core/memory';
@@ -18,6 +20,15 @@ import { AppAwareness } from '../platform/awareness';
 import { HybridBrain, initialBrainState } from '../ai/HybridBrain';
 
 export class CompanionController {
+  private conversationActive = false;
+  private conversationQuietUntil = 0;
+  private conversationQuietTimer?: ReturnType<typeof setTimeout>;
+  private releasingConversationFocus = false;
+  private conversationInference = false;
+  private conversationBounds?: { x: number; y: number; width: number; height: number };
+  private muteUntil = 0;
+  private muteTimer?: ReturnType<typeof setTimeout>;
+  onConversationClose: () => void = () => {};
   readonly events = new EventBus();
   private emotions: EmotionEngine;
   private memory: Memory;
@@ -112,6 +123,7 @@ export class CompanionController {
     this.events.on('CHARACTER_PICKED_UP', () => this.setAnimation('picked_up'));
     this.events.on('CHARACTER_LANDED', () => this.react('landing', 'neutral', 430));
     this.events.on('USER_BECAME_IDLE', () => {
+      if (this.conversationQuiet()) return;
       this.cancelActivity(); this.emotions.suspend();
       this.context.idle(powerMonitor.getSystemIdleTime()); this.context.hover(false);
       this.state.sleeping = true; this.body.walking = false; this.body.vx = 0; this.sessions.clear();
@@ -134,11 +146,50 @@ export class CompanionController {
       console.log('[ducky] Companion ready', this.windowOrigin());
     });
     window.on('blur', () => this.endDrag(false));
-    window.on('hide', () => { if (this.state.visible && !this.disposed) this.setVisible(false); });
+    window.on('hide', () => { if (!this.releasingConversationFocus && this.state.visible && !this.disposed) this.setVisible(false); });
     window.webContents.on('render-process-gone', (_event, details) => {
       console.error('[ducky] Companion renderer exited', details.reason);
       this.setVisible(false);
     });
+  }
+  setConversationInference(active: boolean): void { this.conversationInference = active; this.configureBrain(); }
+  private conversationQuiet(): boolean { return this.conversationActive || Date.now() < this.conversationQuietUntil; }
+  releaseConversationFocus(): void {
+    // This hide only yields native focus; it must not invoke the user-hide path.
+    this.releasingConversationFocus = true;
+    try {
+      this.window.setFocusable(false); this.window.hide(); this.window.showInactive();
+      this.window.setAlwaysOnTop(this.store.value.alwaysOnTop && !this.store.value.desktopOnly, 'screen-saver');
+    } finally { this.releasingConversationFocus = false; }
+  }
+  beginConversation(): void {
+    clearTimeout(this.conversationQuietTimer); this.conversationQuietTimer = undefined;
+    this.endDrag(false); this.cancelClicks(); this.cancelReaction(); this.cancelActivity(); this.dismissBubble();
+    this.conversationActive = true; this.state.sleeping = false;
+    this.body.walking = false; this.body.vx = 0; this.body.vy = 0;
+    this.setVisible(true); this.setAnimation('idle'); this.configureTimers();
+  }
+  presentConversation(view: ConversationView): void {
+    if (this.window.isDestroyed()) return;
+    if (view.active || view.reply) {
+      const base = { ...windowOrigin(this.body, this.size()), ...this.size() };
+      const result = conversationLayout(base, nearestArea(this.body, workAreas()), view.panel);
+      this.conversationBounds = result.bounds; view.layout = result.layout;
+    } else this.conversationBounds = undefined;
+    this.state.conversation = view; this.moveWindow(); this.publish();
+  }
+  finishConversation(): void {
+    if (!this.conversationActive) return;
+    this.conversationActive = false; this.conversationBounds = undefined; this.moveWindow();
+    this.conversationQuietUntil = Date.now() + 60000;
+    clearTimeout(this.conversationQuietTimer);
+    this.conversationQuietTimer = setTimeout(() => { this.conversationQuietTimer = undefined; this.configureTimers(); }, 60000);
+    this.setAnimation(this.baseAnimation()); this.configureTimers();
+  }
+  muteFor(minutes: number): void {
+    this.muteUntil = Date.now() + minutes * 60000; clearTimeout(this.muteTimer);
+    this.muteTimer = setTimeout(() => { this.muteUntil = 0; this.muteTimer = undefined; }, minutes * 60000);
+    if (this.speech.current?.priority === 'low') this.dismissBubble();
   }
   private saveMemory(): void {
     if (!this.store.value.memoryEnabled) { if (this.state) this.state.memory = []; return; }
@@ -178,10 +229,10 @@ export class CompanionController {
     if (this.activityTimer) clearTimeout(this.activityTimer); this.activityTimer = undefined; this.activity = undefined;
   }
   private size() { return { width: Math.round(WINDOW.width * this.store.value.characterSize), height: Math.round(WINDOW.height * this.store.value.characterSize) }; }
-  private windowOrigin(): Point { return windowOrigin(this.body, this.size()); }
+  private windowOrigin(): Point { return this.conversationBounds ?? windowOrigin(this.body, this.size()); }
   private moveWindow(): void {
     if (this.window.isDestroyed()) return;
-    this.window.setBounds({ ...this.windowOrigin(), ...this.size() }, false);
+    this.window.setBounds(this.conversationBounds ?? { ...this.windowOrigin(), ...this.size() }, false);
     if (this.ready) this.window.webContents.send(CHANNELS.position, this.windowOrigin());
   }
   private savePosition(): void { this.store.update({ position: { x: this.body.x, y: this.body.y } }); this.state.settings = this.store.value; }
@@ -216,6 +267,7 @@ export class CompanionController {
     this.saySituation(event.situation, event.context);
   }
   private saySituation(situation: Situation, context: DialogueContext = {}): boolean {
+    if (this.conversationQuiet()) return false;
     this.brain.invalidate();
     context = { ...context, personality: this.store.value.personality, profanity: this.store.value.profanity,
       mood: this.emotions.mood, emotions: this.emotions.words(), speechScale: this.emotions.speechScale(),
@@ -226,7 +278,7 @@ export class CompanionController {
     return !!this.dialogue.decide(situation, { ...context, talkativeness: this.store.value.talkativeness, fullscreen: this.sessions.fullscreen }, speech => {
       if (!this.speech.canOffer(speech.priority, this.speechOptions(speech))) return false;
       this.brain.route(situation, context, speech, () =>
-        !this.disposed && this.state.visible && !this.state.paused && !this.state.sleeping && !this.sessions.fullscreen &&
+        !this.conversationQuiet() && !this.disposed && this.state.visible && !this.state.paused && !this.state.sleeping && !this.sessions.fullscreen &&
         (!situation.startsWith('drag_') || this.state.dragging) &&
         (!situation.startsWith('hover_') || this.hovered) &&
         (!(situation.startsWith('app_') || situation === 'late_night_working') || app === this.sessions.current?.name),
@@ -237,9 +289,9 @@ export class CompanionController {
   private speechOptions(line: DirectedSpeech) {
     const area = nearestArea(this.body, workAreas());
     const tooHigh = this.windowOrigin().y <= area.y + 20;
-    return { muted: this.store.value.mute, then: line.then, followUpDelayMs: 1500 + Math.random() * 1000,
+    return { muted: this.store.value.mute || Date.now() < this.muteUntil, then: line.then, followUpDelayMs: 1500 + Math.random() * 1000,
       fullscreen: this.sessions.fullscreen,
-      blocked: !this.state.visible || this.state.paused || this.state.sleeping || tooHigh,
+      blocked: this.conversationQuiet() || !this.state.visible || this.state.paused || this.state.sleeping || tooHigh,
       cooldownMs: this.store.value.talkativeness === 'quiet' ? 15000 : this.store.value.talkativeness === 'chatty' ? 2500 : 6500 };
   }
   private say(line: DirectedSpeech): boolean {
@@ -267,6 +319,7 @@ export class CompanionController {
     this.publish();
   }
   hover(active: boolean): void {
+    if (this.conversationActive) return;
     this.brain.invalidate();
     this.hovered = active;
     if (this.hoverTimer) clearTimeout(this.hoverTimer); this.hoverTimer = undefined;
@@ -286,7 +339,7 @@ export class CompanionController {
     if (!this.window.isDestroyed()) this.window.setIgnoreMouseEvents(!(interactive || !!this.grab), { forward: true });
   }
   startDrag(local: Point): void {
-    if (!this.ready || this.state.paused || !this.state.visible || this.grab) return;
+    if (this.conversationActive || !this.ready || this.state.paused || !this.state.visible || this.grab) return;
     this.brain.invalidate(); this.cancelActivity();
     const size = this.size();
     if (local.x < 0 || local.y < 0 || local.x > size.width || local.y > size.height) throw new Error('Invalid grab offset');
@@ -366,7 +419,7 @@ export class CompanionController {
     if (active && !this.emotionTimer) { this.emotions.suspend(); this.emotionTimer = setInterval(() => this.emotionTick(), 30000); }
     if (!active && this.emotionTimer) { clearInterval(this.emotionTimer); this.emotionTimer = undefined; }
     this.cursor.configure(active, !!this.grab);
-    const needMotion = active && !this.grab && moving(this.body);
+    const needMotion = active && !this.conversationActive && !this.grab && moving(this.body);
     if (needMotion && !this.motionTimer) {
       this.lastMotion = performance.now();
       this.motionTimer = setInterval(() => this.motionTick(), 1000 / 60);
@@ -377,10 +430,10 @@ export class CompanionController {
     if (!active && this.idleTimer) { clearInterval(this.idleTimer); this.idleTimer = undefined; }
   }
   private configureBrain(): void {
-    this.brain.configure(this.store.value, !this.ready || this.disposed || !this.state.visible || this.state.paused ||
+    this.brain.configure(this.store.value, this.conversationInference || this.conversationQuiet() || !this.ready || this.disposed || !this.state.visible || this.state.paused ||
       this.state.sleeping || this.sessions.fullscreen || this.privateApp);
   }
-  testAI(): Promise<void> { return this.brain.connect(); }
+  testAI(): Promise<void> { return this.conversationActive ? Promise.resolve() : this.brain.connect(); }
   private motionTick(): void {
     const now = performance.now(); const result = step(this.body, (now - this.lastMotion) / 1000, workAreas(), this.size(), this.store.value.reducedMotion || this.reducedMotion);
     this.lastMotion = now; this.body = result.body; this.moveWindow();
@@ -397,6 +450,7 @@ export class CompanionController {
     }
   }
   private behaviourTick(): void {
+    if (this.conversationQuiet()) return;
     this.reducedMotion = systemPreferences.getAnimationSettings().prefersReducedMotion;
     if (!this.state.sleeping) for (const event of this.context.tick()) this.respond(event);
     this.ambientTick();
@@ -408,7 +462,7 @@ export class CompanionController {
     this.performActivity(behaviour);
   }
   private performActivity(behaviour: Behaviour): void {
-    if (!this.state.visible || this.state.paused || this.state.dragging || this.sessions.fullscreen || !this.fullscreenKnown) return;
+    if (this.conversationQuiet() || !this.state.visible || this.state.paused || this.state.dragging || this.sessions.fullscreen || !this.fullscreenKnown) return;
     if (behaviour === 'walk_left' || behaviour === 'walk_right') {
       this.body = walk(this.body, behaviour === 'walk_left' ? 'left' : 'right', this.scheduler.walkDistance());
       this.setAnimation('walking'); this.configureTimers();
@@ -442,7 +496,7 @@ export class CompanionController {
     }
   }
   checkIdle(): void {
-    if (this.grab || this.state.paused || !this.state.visible) return;
+    if (this.conversationQuiet() || this.grab || this.state.paused || !this.state.visible) return;
     const sleeping = powerMonitor.getSystemIdleTime() >= this.store.value.idleToSleepMinutes * 60;
     if (sleeping !== this.state.sleeping) {
       this.cancelReaction(); this.events.emit(sleeping ? 'USER_BECAME_IDLE' : 'USER_RETURNED', undefined);
@@ -451,12 +505,14 @@ export class CompanionController {
   }
   setVisible(visible: boolean): void {
     if (visible === this.state.visible) return;
+    if (!visible) this.onConversationClose();
     this.endDrag(false); this.state.visible = visible; this.cancelReaction(); this.cancelClicks();
     if (!visible) { this.dismissBubble(); this.window.hide(); }
     else { this.setInteractive(false); this.window.showInactive(); this.setAnimation(this.baseAnimation()); }
     this.configureTimers(); this.publish(); console.log('[ducky] Visible:', visible);
   }
   togglePause(): void {
+    this.onConversationClose();
     this.endDrag(false); this.state.paused = !this.state.paused; this.cancelReaction(); this.cancelClicks(); this.dismissBubble();
     this.setAnimation(this.state.paused ? 'idle' : this.baseAnimation()); this.configureTimers(); this.publish();
     console.log('[ducky] Paused:', this.state.paused);
@@ -486,6 +542,7 @@ export class CompanionController {
     this.window.setAlwaysOnTop(this.store.value.alwaysOnTop && !this.store.value.desktopOnly, 'screen-saver');
   }
   recover(reason: string, reset = false): void {
+    if (this.conversationActive) { this.onConversationClose(); this.finishConversation(); }
     this.endDrag(false); this.cancelActivity(); this.cancelReaction();
     this.fall = undefined;
     this.body = reset ? resetPosition(primaryArea(), this.size()) : recover(this.body, workAreas(), this.size());
@@ -494,6 +551,8 @@ export class CompanionController {
   }
   resume(): void { this.events.emit('APP_RESUMED', undefined); this.recover('system resume'); this.checkIdle(); }
   dispose(): void {
+    clearTimeout(this.conversationQuietTimer);
+    clearTimeout(this.muteTimer);
     this.memoryStore?.flush();
     this.brain.dispose();
     this.disposed = true; this.cursor.stop(); this.awareness.dispose(); this.context.suspend();

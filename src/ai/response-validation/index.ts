@@ -1,6 +1,7 @@
 import { ANIMATION_IDS, EMOTION_IDS, type AnimationId, type EmotionId } from '../../animation/adapter';
 import { POLICIES, type DirectedSpeech } from '../../core/dialogue';
 import { isRecord } from '../../shared/schemas/settings';
+import { disallowedModelOutput, disallowedModelText, normalizeLanguage } from '../../core/content-safety';
 import type { AIContext } from '../prompts';
 
 export type Validation = { kind: 'invalid' } | { kind: 'silent' } | { kind: 'speech'; speech: DirectedSpeech };
@@ -13,7 +14,8 @@ const invented = /\b(tabs?|websites?|sites?|pages?|videos?|emails?|messages?|cat
 const profanity = /\b(fuck\w*|shit\w*|bullshit|bitch\w*|ass|asshole\w*|arse\w*|bastard\w*|cunt\w*|dick\w*|piss\w*|damn\w*|crap|wtf|stfu)\b/i;
 const strong = /\b(fuck\w*|bullshit|bitch\w*|ass|asshole\w*|arse\w*|bastard\w*|cunt\w*|dick\w*|piss\w*|wtf|stfu|nigg\w*|fagg\w*|retard\w*|kike\w*|chink\w*|trann\w*|spic)\b/i;
 export function rejectedLanguage(text: string, allowed: boolean): boolean {
-  const normalized = text.normalize('NFKC').replace(/[\u200b-\u200f\u2060\ufeff]/g, '').replace(/(?<=\w)!(?=\w)/g, 'i').replace(/[0@13$]/g, c => ({'0':'o','@':'a','1':'i','!':'i','3':'e','$':'s'})[c]!);
+  if (disallowedModelText(text)) return true;
+  const normalized = normalizeLanguage(text);
   if (strong.test(normalized)) return true;
   if (!allowed) return profanity.test(normalized) || /\b(hell|bloody)\b|for f[\u2014\u2013-]/i.test(normalized);
   const rest = normalized.replace(/\b(damn|hell|shit|crap|bloody)\b/gi, '').replace(/for f[\u2014\u2013-]+(?:\s*sake)?/gi, '');
@@ -77,6 +79,7 @@ export function validateResponse(raw: string, context: AIContext, recent: readon
   if (raw.length > 8192) return { kind: 'invalid' };
   let value: unknown;
   try { value = JSON.parse(raw); } catch { return { kind: 'invalid' }; }
+  if (disallowedModelOutput(value)) return { kind: 'invalid' };
   if (!isRecord(value) || Object.keys(value).sort().join(',') !== 'animation,dialogue,emotion,shouldSpeak,then' ||
     typeof value.shouldSpeak !== 'boolean' || typeof value.dialogue !== 'string' || typeof value.then !== 'string' ||
     typeof value.emotion !== 'string' || typeof value.animation !== 'string') return { kind: 'invalid' };

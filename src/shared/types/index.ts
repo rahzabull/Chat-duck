@@ -2,6 +2,8 @@ export interface Point { x: number; y: number }
 export interface WorkArea extends Point { width: number; height: number; id: number }
 export type Direction = 'left' | 'right';
 export interface Settings {
+  conversationShortcut: string;
+  conversationRetention: import('../../core/conversation/types').Retention;
   personality: 'wholesome' | 'playful' | 'sarcastic' | 'unhinged';
   profanity: boolean;
   activityLevel: 'calm' | 'normal' | 'lively';
@@ -34,6 +36,8 @@ export interface BrainState {
   sample?: string;
 }
 export interface CompanionState {
+  conversation?: import('../../core/conversation/types').ConversationView;
+  library?: { memories: import('../../core/conversation/types').UserMemory[]; conversations: import('../../core/conversation/types').Conversation[] };
   visible: boolean; paused: boolean; sleeping: boolean; dragging: boolean;
   sunglasses: boolean; mood: string; memory: string[];
   awarenessActive: boolean;
@@ -42,8 +46,14 @@ export interface CompanionState {
   bubble: string | null; settings: Settings; debugHitbox: boolean; version: string;
 }
 export interface CursorUpdate { cursor: Point; origin: Point }
-export type Command = 'show' | 'hide' | 'pause' | 'mute' | 'reset' | 'settings' | 'quit';
+export type Command = 'talk' | 'show' | 'hide' | 'pause' | 'mute' | 'reset' | 'settings' | 'quit';
 export interface DuckyAPI {
+  talkCopy(): Promise<void>;
+  talkSend(text: string): Promise<void>;
+  talkEnd(): Promise<void>;
+  talkTyping(): void;
+  talkPanel(expanded: boolean): void;
+  libraryAction(action: import('../../core/conversation/types').LibraryAction): Promise<void>;
   getState(): Promise<CompanionState>;
   testAI(): Promise<void>;
   forgetMemory(): Promise<CompanionState>;

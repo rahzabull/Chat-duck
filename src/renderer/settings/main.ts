@@ -1,3 +1,4 @@
+import { ConversationSettings, MemoryEditor } from './conversation';
 import { createElement as h, useEffect, useState, type ChangeEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Command, CompanionState, EditableSettings } from '../../shared/types';
@@ -54,7 +55,7 @@ function SettingsApp() {
         } }), check('reducedMotion', 'Reduce motion'),
       h('p', { className: 'hint' }, 'Your system’s reduced-motion preference is also respected.')),
     h('section', { 'aria-labelledby': 'brain' }, h('h2', { id: 'brain' }, 'Brain (local AI)'),
-      check('aiEnabled', 'Use local AI for fresh lines'),
+      check('aiEnabled', 'Use local AI for conversation and fresh lines'),
       h('p', { className: 'hint' }, 'Runs on this computer through Ollama. Nothing is sent to the internet.'),
       h('label', { htmlFor: 'ai-model' }, 'Installed model'),
       h('select', { id: 'ai-model', disabled: !settings.aiEnabled, value: settings.aiModel,
@@ -75,15 +76,17 @@ function SettingsApp() {
       state.brain.version && h('p', { className: 'hint' }, `Ollama ${state.brain.version}`),
       state.brain.sample && h('p', { className: 'hint' }, `Sample: ${state.brain.sample}`),
       h('p', { className: 'hint' }, 'Install Ollama and pull a model yourself, then test the connection to refresh this list. Ducky never downloads models.')),
+    h(ConversationSettings, { state, save }),
     h('section', { 'aria-labelledby': 'memory' }, h('h2', { id: 'memory' }, 'Memory'),
       check('memoryEnabled', 'Let Ducky remember things'),
       h('label', { htmlFor: 'preferred-name' }, 'What should Ducky call you?'),
       h('input', { id: 'preferred-name', type: 'text', maxLength: 30, disabled: !settings.memoryEnabled, defaultValue: settings.preferredName, key: settings.preferredName, onBlur: (event: ChangeEvent<HTMLInputElement>) => save({ preferredName: event.target.value }) }),
-      h('h3', null, 'What Ducky remembers'),
+      h(MemoryEditor, { state }),
+      h('h3', null, 'Interaction memories'),
       h('ul', null, ...state.memory.map(line => h('li', { key: line }, line))),
-      h('p', { className: 'hint' }, 'Only your interactions with Ducky and the name you enter. No app history or screen data. Pickup counts roll off after seven days; totals and notable moments stay until forgotten. Turning memory off deletes them and your name.'),
+      h('p', { className: 'hint' }, 'Your explicit memories, retained conversations, interactions with Ducky and the name you enter. No desktop observations or screen data. Pickup counts roll off after seven days; totals and notable moments stay until forgotten. Turning memory off deletes them and your name.'),
       h('button', { type: 'button', onClick: () => setForgetting(true) }, 'Forget everything'),
-      forgetting && h('div', { role: 'alert' }, h('p', null, 'Forget all interaction memories and your preferred name?'),
+      forgetting && h('div', { role: 'alert' }, h('p', null, 'Forget all memories, conversation archives, interaction stats and your preferred name?'),
         h('button', { type: 'button', onClick: () => { void window.ducky.forgetMemory().then(next => { setState(next); setForgetting(false); }).catch(() => setError('Could not delete memory. Please try again.')); } }, 'Yes, forget everything'),
         h('button', { type: 'button', onClick: () => setForgetting(false) }, 'Cancel'))),
     h('section', { 'aria-labelledby': 'privacy' }, h('h2', { id: 'privacy' }, 'Privacy'),

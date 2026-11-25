@@ -27,6 +27,7 @@ export class DuckyTray {
   menu(): Menu {
     const state = this.state();
     return Menu.buildFromTemplate([
+      { label: 'Talk to Ducky', click: () => this.command('talk') },
       { label: 'Show Ducky', enabled: !state.visible, click: () => this.command('show') },
       { label: 'Hide Ducky', enabled: state.visible, click: () => this.command('hide') },
       { label: state.paused ? 'Resume' : 'Pause', click: () => this.command('pause') },

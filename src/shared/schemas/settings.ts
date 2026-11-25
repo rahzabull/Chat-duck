@@ -3,6 +3,7 @@ import { sanitizeName } from '../../core/memory';
 import type { EditableSettings, Settings } from '../types';
 
 export const DEFAULT_SETTINGS: Settings = {
+  conversationShortcut: 'Ctrl+Alt+D', conversationRetention: '7 days',
   personality: 'sarcastic', profanity: false, activityLevel: 'normal', memoryEnabled: true, preferredName: '', installSeed: 0, dailyMood: null,
   alwaysOnTop: true, desktopOnly: false, characterSize: 1, launchAtStartup: false,
   walking: true, talkativeness: 'normal', idleToSleepMinutes: 5, reducedMotion: false,
@@ -19,10 +20,14 @@ const booleanKeys = ['alwaysOnTop', 'desktopOnly', 'launchAtStartup', 'walking',
 export const isModelName = (value: unknown): value is string => typeof value === 'string' && (value === '' || /^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,199}$/.test(value));
 const isPort = (value: unknown): value is number => finite(value) && Number.isInteger(value) && value >= 1 && value <= 65535;
 
+export const isShortcut = (v: unknown): v is string => typeof v === 'string' && /^(?:(?:Ctrl|Alt|Shift|Super)\+){1,3}(?:[A-Z0-9]|F(?:[1-9]|1[0-2]))$/.test(v) && new Set(v.split('+')).size === v.split('+').length;
+
 /** Tolerant disk boundary: invalid fields fall back independently. */
 export function parseSettings(value: unknown): Settings {
   const result: Settings = { ...DEFAULT_SETTINGS };
   if (!isRecord(value)) return result;
+  if (isShortcut(value.conversationShortcut)) result.conversationShortcut = value.conversationShortcut;
+  if (['off', '7 days', '30 days'].includes(value.conversationRetention as string)) result.conversationRetention = value.conversationRetention as Settings['conversationRetention'];
   if (['wholesome', 'playful', 'sarcastic', 'unhinged'].includes(value.personality as string)) result.personality = value.personality as Settings['personality'];
   if (['calm', 'normal', 'lively'].includes(value.activityLevel as string)) result.activityLevel = value.activityLevel as Settings['activityLevel'];
   if (typeof value.preferredName === 'string') result.preferredName = sanitizeName(value.preferredName);
@@ -44,6 +49,8 @@ export function parseSettings(value: unknown): Settings {
 export function isSettingsPatch(value: unknown): value is Partial<EditableSettings> {
   if (!isRecord(value) || Object.keys(value).length === 0) return false;
   return Object.entries(value).every(([key, v]) => {
+    if (key === 'conversationShortcut') return isShortcut(v);
+    if (key === 'conversationRetention') return ['off', '7 days', '30 days'].includes(v as string);
     if (key === 'personality') return ['wholesome', 'playful', 'sarcastic', 'unhinged'].includes(v as string);
     if (key === 'activityLevel') return ['calm', 'normal', 'lively'].includes(v as string);
     if (key === 'preferredName') return typeof v === 'string' && v.length <= 30;

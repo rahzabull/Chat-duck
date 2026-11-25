@@ -1,9 +1,58 @@
 # Character animation contract
 
+## Expansion Phase A conversation layer (animator handoff)
+
+`setConversationState(state: ConversationState | null)` is independent of `play`.
+Null removes the conversation layer and resumes the underlying activity. Renderer
+never inspects SVG. Art remains 320×300; the surrounding window can grow without
+moving or scaling the foot anchor.
+
+| Adapter state | Placeholder appearance / timing | Proposed Rive state / trigger |
+| --- | --- | --- |
+| listening | Attentive eyes, slight turn toward input; nod every four seconds | Listening / enterListening |
+| thinking | Looks up; right wing scratches at head on a slow three-second cycle | Thinking / enterThinking |
+| responding | Talking beak during a beat; four small wing gestures | Responding / enterResponding |
+| confused | Static 14-degree head tilt | Confused / enterConfused |
+| explaining | Larger shoulder gestures, finite five/six cycles | Explaining / enterExplaining |
+| amused | Squinted eyes; four short body bounces | Amused / enterAmused |
+| sarcastic | Half-lidded side-eye and uneven brows | Sarcastic / enterSarcastic |
+| unsure | Both wings lift into a held shrug | Unsure / enterUnsure |
+| interrupted | Mouth stops immediately; 300 ms lean back, listening at 350 ms | Interrupted / interruptConversation |
+| conversation_end | 300 ms head reset; optional sign-off, then previous activity | ConversationEnd / endConversation |
+
+Proposed additions to Rive `DuckyState`:
+
+- `conversationActive` boolean enables the Conversation layer; false stops all loops.
+- `conversationState` number: 0 none, 1 listening, 2 thinking, 3 responding,
+  4 confused, 5 explaining, 6 amused, 7 sarcastic, 8 unsure, 9 interrupted,
+  10 conversation_end. These are stable animator-facing IDs.
+- Named triggers above restart discrete entrances, never on unrelated state updates.
+- `speaking` boolean controls the independent Mouth layer; false on typing,
+  close, final-beat completion or panel dismissal. Thinking does not move the mouth.
+- `inputDirectionX/Y` numbers (-1…1) can target input in future art; placeholder
+  uses an attentive tilt.
+- `reducedMotion` disables loops, bounces and gesture motion, preserving readable
+  static facial poses. Visibility/pause stops activity. Explicit conversations
+  can listen while ambient activities are paused.
+
+Neutral/warm tones map to responding; other validated tones map to named states.
+Thinking/listening are lifecycle states. The placeholder beak speaks timed bubbles;
+reading panels hold the tone pose with finite gestures. All conversation loops
+cease on exit. There is no new continuous idle animation.
+
+Shoulder fix: wings use view-box pivots (113,230) and (201,230), shared by base
+rotations and pose transforms. Stretch, shrug, scratch and flapping rotate around
+those anchors. No wing translation may separate shoulder and body. Validate
+stretch in both directions and sizes 0.6/1.0/1.6 when supplying Rive art.
+
+All ten states, stretch attachment and reduced-motion appearances:
+**verified on desktop: pending Claude**. No Rive runtime or asset is added.
+
 The required section-20 interface is preserved, with a completion subscription:
 
 ```typescript
 interface CharacterAnimationAdapter {
+  setConversationState(state: ConversationState | null): void;
   play(animation: string): void;
   setEmotion(emotion: string): void;
   setEyeTarget(x: number, y: number): void;

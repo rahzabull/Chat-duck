@@ -22,6 +22,14 @@ function setup() {
   return { brain, provider, present, selected, changed };
 }
 describe('hybrid dialogue routing', () => {
+  it.each([false, true])('uses the authored ambient fallback for blocked language with profanity=%s', async profanity => {
+    const { brain, provider, present } = setup(); brain.configure({ ...config, profanity }, false); await flush();
+    for (const text of ['Retard?', 'You are an idiot.', 'Try some porn.', 'Go kill yourself.']) {
+      provider.generate.mockResolvedValueOnce(raw(text)); present.mockClear();
+      brain.route('thought', { profanity }, fallback, () => true, present); await flush();
+      expect(present).toHaveBeenCalledExactlyOnceWith(fallback);
+    }
+  });
   it('does no network work when disabled', async () => {
     const { brain, provider, present } = setup(); brain.configure(DEFAULT_SETTINGS, false); await brain.connect();
     brain.route('thought', {}, fallback, () => true, present);

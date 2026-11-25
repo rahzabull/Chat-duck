@@ -1,3 +1,5 @@
+export const CONVERSATION_STATES = ['listening', 'thinking', 'responding', 'confused', 'explaining', 'amused', 'sarcastic', 'unsure', 'interrupted', 'conversation_end'] as const;
+export type ConversationState = typeof CONVERSATION_STATES[number];
 export const ANIMATION_IDS = [
   'look_around', 'yawn', 'stretch', 'dance', 'side_eye', 'nap', 'strike', 'sunglasses', 'bread_snack', 'visitor',
   'idle', 'blink', 'look_left', 'look_right', 'walking', 'startled', 'picked_up',
@@ -8,6 +10,7 @@ export const EMOTION_IDS = ['neutral', 'curious', 'suspicious', 'startled', 'ang
 export type EmotionId = typeof EMOTION_IDS[number];
 
 export interface CharacterAnimationAdapter {
+  setConversationState(state: ConversationState | null): void;
   play(animation: string): void;
   setEmotion(emotion: string): void;
   setEyeTarget(x: number, y: number): void;

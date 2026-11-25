@@ -1,5 +1,58 @@
 # Privacy
 
+## Expansion Phase A: explicit memories and conversations
+
+This extends the M3-only description below. M3 `memory.json` keeps its interaction
+schema. New local plaintext files live in `app.getPath('userData')`, normally
+`%APPDATA%/Ducky` on Windows:
+
+| File | Saved fields | Retention |
+| --- | --- | --- |
+| `memories.json` | Array of {id, text, category, createdAt, source}; category: about_me/preference/project/idea/other; source: user_said/user_edited | Until deleted, memory disabled or Forget everything |
+| `conversations.json` | Array of {id, startedAt, endedAt, turns:[{role:user/assistant, text, at}], summary?, topics?} | Off / seven days (default) / 30 days from endedAt |
+| `settings.json` additions | conversationShortcut, conversationRetention | Until changed |
+
+Long-term memories require an explicit remember command, a model proposal followed
+by the user's yes, or adding one in Settings. `remember this` saves the immediately
+preceding conversational message after that explicit instruction. No desktop
+observations create memories. Source labels mean user authorization/editing.
+Text is bounded to 4,000 characters per memory/archived message; IDs, timestamps
+and categories are validated. Unknown fields are discarded. Archives cap at 200
+messages per session and 500 sessions; explicit memories cap at 1,000.
+
+Conversations contain typed input and Ducky's replies. They never receive awareness
+context, app-history samples, private-app flags, window titles, screen data or
+screenshots. Observed app names never enter these files; user-supplied conversation
+text may include app names. Conversation focus does not capture a native window
+handle or application identity. Closing hides and immediately shows the duck
+inactive, letting Windows activate the next window in z-order.
+
+With AI enabled, local Ollama receives the last 12 messages, up to eight selected
+memories, up to three summaries/topics, preferred name, local time, preset and tool
+descriptions. Closing may send the last 24 messages to the same provider for a
+short summary. Offline topics come from user words. No cloud, file/screen access
+or browsing exists. Conversation prompts do not receive desktop-awareness data.
+Ollama's logs, OS backups and exported files are outside Ducky's deletion control.
+
+Files use validated schemas and atomic .tmp/write/rename. Explicit saves, edits,
+deletes and archive changes commit before acknowledgement. Generated summary
+updates debounce 750 ms and flush on quit; the base archive commits on end.
+Retention purges at startup, on retention changes and daily. Off stores no turns,
+topics or summaries after a conversation ends; explicit memories still work.
+
+Turning **Let Ducky remember things** off clears M3 stats, the preferred name,
+long-term memories and conversations, deletes files and temporary counterparts,
+cancels summaries and prevents writes. Conversations still use temporary RAM
+context. **Forget everything** clears all three stores and the name, aborts pending
+conversation work, and leaves memory enabled for a fresh start. A late summary
+cannot resurrect a deleted archive. Failed writes/deletions produce errors instead
+of success claims.
+
+Settings supports memory editing/category/deletion and individual/all archive
+deletion. Export requires an explicit click and native save dialog; exported .txt
+files remain at the selected location until the user deletes them. Copy puts only
+the current reply on the system clipboard after a click. Neither uses the network.
+
 Ducky runs locally without an account, telemetry, advertising, remote content or
 update checks. Dialogue always has a hand-written fallback. Optional local AI is
 off by default and connects only from the main process to Ollama at

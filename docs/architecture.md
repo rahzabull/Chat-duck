@@ -1,4 +1,97 @@
-# Ducky architecture (Milestones 1–3)
+# Ducky architecture (Milestones 1–3 and Expansion Phase A)
+
+## Expansion Phase A: conversation flow
+
+`main/conversation/controller.ts` owns lifecycle, focus, shortcut registration,
+local commands and presentation. `engine.ts` owns serialized generation, aborts,
+deadlines, output validation and tool rounds. `core/conversation/` contains
+Electron-free intent parsing, pronoun conversion, keyword/recency retrieval,
+retention, presentation, schema validation and window layout. Retrieval implements
+`MemoryRetrieval`, replaceable with embeddings later.
+
+```text
+Double-click / globalShortcut / tray Talk to Ducky
+  -> synchronously setFocusable(true), show, focus, webContents.focus (no await)
+  -> suspend activities, movement and ambient AI -> focus-confirmed attached textarea
+Enter -> validated companion-only IPC -> cancel old generation -> local parser
+  -> local command -> atomic operation -> authored acknowledgement
+  -> other text -> preset + honesty + date/time + preferred name
+                  + last 12 messages + 8 memories + 3 summaries
+     -> MAIN Ollama /api/chat -> JSON validation -> tone -> adapter state
+     -> optional tool registry -> permissions -> actual tool result -> finalization
+     -> current reply only -> timed beats OR safe DOM reading panel
+Escape / bye / 20s blur / 90s no input / hide / pause
+  -> abort inference -> setFocusable(false) -> hide -> showInactive -> reapply topmost
+  -> retain conversation if allowed -> small summary request
+  -> optional authored sign-off -> resume previous activity
+```
+
+Conversation options: temperature 0.8, num_predict 700, 45-second request deadline,
+stream:false, think:false and JSON format. Summary requests use 200 predicted tokens.
+At eight seconds an ordinary pending reply shows one authored thinking line.
+New input/close invalidate stale results even with a non-cooperative fake provider.
+Ambient AI remains suspended through summarization after the visible conversation
+ends. All transport still uses the fixed 127.0.0.1 origin with redirects denied.
+Renderer/core make no requests. There is no cloud fallback or new dependency.
+
+Immediate prompts keep the last 12 user/assistant messages. Active sessions retain
+at most 200 messages for the optional archive and drop RAM context on close.
+Retrieval ranks exact keyword overlap above recency, returning at most eight
+memories and three summaries. It never ingests app awareness. Offline archives get
+up to six keywords from user text. A summary request uses the last 24 messages;
+failure/cancellation preserves those fallback topics. Archives cap at 500 sessions;
+explicit memories cap at 1,000 records.
+
+The registry defines safe, confirm and blocked permissions. Recall tools are safe.
+Model-proposed remember/forget requires a subsequent exact yes. No cancels, and
+unrelated input drops pending confirmation. Explicit local remember/forget commands
+already express authorization. Argument validation, a two-execution-round cap and
+failure handling are authored code. Actual results go back to the model. Failed
+operations bypass model prose; successful mutation acknowledgements use the actual
+operation result. A guard rejects obvious unverified external-action claims from
+tool-free replies. Model output is never evaluated or passed to a shell.
+
+Window expansion unions the original duck rectangle with a response surface,
+clamped to the display work area. Renderer receives explicit character and content
+offsets so the foot anchor stays fixed. Movement stops during conversation;
+display/size recovery ends it. Only the adapter inspects/mutates SVG. Markdown uses
+text nodes and an allowlisted AST: no raw HTML, images or link interpretation.
+Transcript views exist only in the Settings archive.
+
+New IPC is allowlisted and strictly validated. Send/end/typing/panel/copy require
+the companion main frame; library mutations require the Settings main frame.
+Export accepts an archive ID and opens a native save dialog, never a renderer path.
+Focus activation runs synchronously inside the hotkey or double-click IPC path,
+before any async work. The state publication asks the renderer to focus the input
+only when `isFocused()` confirms activation. After 300 ms without focus, one retry
+uses `setAlwaysOnTop(true, 'screen-saver')`, `moveTop()`, `focus()` and
+`webContents.focus()`. A final check 300 ms later restores the topmost preference.
+Failure leaves the input hidden/disabled and the bubble saying "Click me to type."
+A duck/bubble click retries activation legitimately. Blur also hides the input.
+On close, `setFocusable(false)`, `hide()` and `showInactive()` run consecutively,
+then reapply the user's always-on-top/desktop-only preference. Windows chooses the
+next foreground window in z-order, normally the previously used app. There is no
+PowerShell focus helper or captured native handle. Desktop activation still needs
+verification against a real foreground application; fake-window tests verify order.
+
+`core/content-safety` checks every model output string, including ambient second
+beats, tool arguments and summary topics, independently of the profanity toggle.
+It normalizes common leetspeak/invisible variants and blocks slurs, sexual words,
+self-harm encouragement and directed/short insults. A blocked conversation reply
+is discarded and regenerated once with "your last reply contained a disallowed
+word"; a second rejection returns an authored `talk_error` line. Ambient output
+falls back to the authored line; unsafe summaries retain user-derived topics.
+This deterministic blocklist is conservative and is not a semantic classifier.
+User input with fewer than two visible graphemes or no letters receives an authored
+`talk_huh` line without reply inference. Numeric memory-choice commands still work
+locally. The set contains four short clarification lines.
+
+Listening/thinking CSS loops exist only during conversation. Beat timers clear
+on interruption/exit; the extra retention interval runs daily. Quit unregisters
+the shortcut and cancels timers/requests. Native idle CPU still needs measurement.
+
+The remaining sections describe the M1–M3 foundations. Their old double-click
+behavior is superseded: double-click now talks; Settings remains in native menus.
 
 The main process owns all position, movement, behaviour and persistent state.
 The sandboxed renderer presents that state. Pure TypeScript core modules have no

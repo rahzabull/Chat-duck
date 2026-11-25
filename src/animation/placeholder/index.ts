@@ -1,5 +1,5 @@
 import { ACTIVITY_DURATION } from '../../core/behaviour';
-import { ANIMATION_IDS, EMOTION_IDS, type CharacterSurface } from '../adapter';
+import { ANIMATION_IDS, EMOTION_IDS, type ConversationState, type CharacterSurface } from '../adapter';
 import './style.css';
 
 /** SVG DOM, timers and hit-shape knowledge are confined to this adapter. */
@@ -17,6 +17,7 @@ export class PlaceholderDuck implements CharacterSurface {
   private sleeping = false;
   private reduced = false;
   private disposed = false;
+  private conversation: ConversationState | null = null;
   private animation = 'idle';
   private direction: 'left' | 'right' = 'right';
   constructor(private host: HTMLElement) {
@@ -24,8 +25,8 @@ export class PlaceholderDuck implements CharacterSurface {
       <g class="direction"><g class="body-motion">
         <g class="feet"><ellipse data-duck-hit class="foot left-foot" cx="135" cy="290" rx="21" ry="9" fill="#f3932b"/><ellipse data-duck-hit class="foot right-foot" cx="183" cy="290" rx="21" ry="9" fill="#f3932b"/></g>
         <ellipse data-duck-hit class="body" cx="158" cy="250" rx="60" ry="41" fill="#ffd544"/>
-        <g transform="rotate(-20 113 246)"><ellipse data-duck-hit class="wing wing-left" cx="113" cy="246" rx="15" ry="28" fill="#efb930"/></g>
-        <g transform="rotate(20 201 245)"><ellipse data-duck-hit class="wing wing-right" cx="201" cy="245" rx="15" ry="26" fill="#efb930"/></g>
+        <g transform="rotate(-20 113 230)"><ellipse data-duck-hit class="wing wing-left" cx="113" cy="246" rx="15" ry="28" fill="#efb930"/></g>
+        <g transform="rotate(20 201 230)"><ellipse data-duck-hit class="wing wing-right" cx="201" cy="245" rx="15" ry="26" fill="#efb930"/></g>
         <g class="head"><ellipse data-duck-hit cx="159" cy="204" rx="47" ry="42" fill="#ffdf54"/>
           <g class="eyes"><ellipse cx="144" cy="199" rx="14" ry="18" fill="#fffdf2"/><ellipse cx="177" cy="199" rx="14" ry="18" fill="#fffdf2"/>
             <circle class="pupil" cx="145" cy="201" r="6" fill="#282b25"/><circle class="pupil" cx="178" cy="201" r="6" fill="#282b25"/>
@@ -61,6 +62,12 @@ export class PlaceholderDuck implements CharacterSurface {
     if (durations[animation] && this.visible && !this.paused) this.completion = setTimeout(() => {
       this.completion = undefined; this.listeners.forEach(callback => callback(animation));
     }, durations[animation]);
+  }
+  setConversationState(state: ConversationState | null): void {
+    if (this.conversation === state) return;
+    this.conversation = state;
+    if (state) { this.root.dataset.conversation = state; this.stopBreath(); }
+    else { delete this.root.dataset.conversation; this.scheduleBreath(); }
   }
   setEmotion(emotion: string): void { if ((EMOTION_IDS as readonly string[]).includes(emotion)) this.root.dataset.emotion = emotion; }
   setEyeTarget(x: number, y: number): void {
@@ -103,7 +110,7 @@ export class PlaceholderDuck implements CharacterSurface {
   }
   onAnimationComplete(cb: (animation: string) => void): () => void { this.listeners.add(cb); return () => { this.listeners.delete(cb); }; }
   private scheduleBreath(): void {
-    if (this.breathTimer || this.disposed || !this.visible || this.paused || this.reduced ||
+    if (this.conversation || this.breathTimer || this.disposed || !this.visible || this.paused || this.reduced ||
       !['idle', 'look_left', 'look_right', 'sleeping'].includes(this.animation)) return;
     // Four discrete poses per cycle, then eight seconds with no ambient updates.
     // No CSS animation/transition keeps Chromium compositing between these poses.

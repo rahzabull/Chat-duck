@@ -1,5 +1,51 @@
 # Ducky.exe
 
+## Talk to Ducky — Expansion Phase A
+
+Double-click Ducky, press **Ctrl+Alt+D**, or choose **Talk to Ducky** in the tray or
+right-click menu. A small input appears beside him. Enter sends, Shift+Enter adds
+a line (up to three visible lines), and Escape ends. Conversation also ends after
+90 seconds without input or 20 seconds continuously blurred. Settings > Conversation
+records a different shortcut and reports registration conflicts. Settings remains
+in the native menus.
+
+Only the current reply is visible. Short replies appear in timed beats; click to
+advance. Replies over 420 characters, lists and code use a temporary reading panel
+with Expand/Collapse, Copy and Close. Typing interrupts. Ducky's feet stay in place
+as the window grows. There is no companion transcript or chat window.
+
+Try these with AI off as well as on:
+
+- `remember that I prefer working at night`
+- `what do you remember about me?`
+- `forget that` or `forget about night` (multiple matches ask which)
+- `what were we talking about earlier?`
+- `be quiet for 10 minutes`
+- `bye`
+
+Enable local AI and select an installed model to ask general questions, brainstorm,
+get explanations or help with code. Conversation uses the existing main-process
+loopback Ollama provider, a 45-second deadline and an authored thinking line after
+eight seconds. No web, file-reading or screen access exists. When AI is unavailable,
+Ducky says so and local commands continue working.
+
+Settings > Memory supports add/edit/category/delete. The conversation archive in
+Settings supports View, Export .txt and deletion. Retention defaults to seven days,
+optionally 30 days or off. Turning memory off deletes all memories, conversations
+and M3 stats. Forget everything also clears the preferred name. See
+[privacy](docs/privacy.md) for exact storage and deletion behavior.
+
+The companion attempts focus synchronously when conversation opens, with one
+300 ms retry. If activation fails, it shows "Click me to type." with the input
+hidden until a duck/bubble click grants focus. Closing makes it non-focusable,
+then immediately hides and shows it inactive so Windows activates the next window
+in z-order (normally the previous app), and reapplies the always-on-top preference.
+No PowerShell focus capture/restore is used. Native focus return, qwen3:8b quality,
+animation screenshots, mixed-display layout and idle CPU:
+**verified on desktop: pending Claude**. Automated tests do not prove desktop behavior.
+
+The following sections describe the earlier prototype foundations and setup.
+
 A local desktop companion by Ente. **Milestone 2 prototype: “Give Ducky a brain.”**
 A small animated SVG duck lives in a transparent Electron window, walks, follows
 your cursor with his eyes, reacts to clicks, and can be dragged and dropped.
@@ -88,16 +134,16 @@ There is no installer in M1.
 - Hover: suspicious eyes; move the cursor: eyes follow.
 - Click: immediate startled reaction and sometimes a short bubble (no AI wait).
 - Repeated single clicks: escalating annoyance; five within four seconds makes Ducky angry. Space clicks about 600 ms apart to test this without double-clicking.
-- Double-click: open Settings; the first click may already have produced a reaction.
+- Double-click: talk to Ducky; the first click may already have produced a reaction.
 - Drag with the left button: pick up Ducky, then release to fall and bounce. Movement under 4 DIP counts as a click.
 - Right-click the duck: native menu, with the same actions as the tray.
 - Click a bubble: dismiss it. Bubbles otherwise disappear after at least three seconds.
 - Left-click the tray icon: show/hide. Right-click it: Show, Hide, Pause/Resume, Mute/Unmute, Reset position, Settings, Quit.
 - Idle for five minutes by default: sleep. Return: wake on the next idle poll (up to 30 seconds).
 
-The companion window never intentionally takes keyboard focus. Opening Settings
-is an explicit action and focuses its normal window. Transparent regions pass
-clicks through; only the duck's painted shapes and a visible bubble interact.
+The companion window is non-focusable outside conversation. Opening Settings
+focuses its normal window. Transparent regions pass clicks through; the duck,
+visible reply and attached input interact.
 
 Settings apply immediately. Desktop-only mode turns off always-on-top; it does not
 attach Ducky to Explorer's wallpaper. Mute suppresses low-priority bubbles; direct

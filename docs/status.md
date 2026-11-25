@@ -1,5 +1,35 @@
 # Ducky implementation status
 
+## Expansion Phase A — talk to Ducky (2026-11-25)
+
+| Area | Implementation / automated verification | Desktop verification |
+| --- | --- | --- |
+| Entry and focus | Synchronous activation, one 300 ms retry, click-to-type fallback, hide/showInactive on close; fake-window order and renderer tests | Round 2 desktop retest pending Claude |
+| Current reply | Attached one-to-three-line input, Enter/Shift+Enter/Esc, 20s blur/90s inactivity, interruption, beats, safe markdown reading panel/Expand/Copy/Close | verified on desktop: pending Claude |
+| Geometry | Clamped upward/sideways expansion, fixed feet; boundary tests | verified on desktop: pending Claude |
+| Engine | Same main-only loopback provider/model; JSON, 700 tokens, 0.8 temperature, 45s timeout, 8s thinking line; fake-provider tests | verified on desktop: pending Claude |
+| Output safety | Shared mandatory blocklist, leetspeak normalization, short/directed insult rejection, one conversation regeneration then authored error; ambient fallback and summary/tool-argument checks | Round 2 desktop retest pending Claude |
+| Short/garbled input | Under two visible characters or no letters gets one of four authored talk_huh lines without reply inference; numeric memory choices remain local | Round 2 desktop retest pending Claude |
+| Local commands | Remember/forget/disambiguate/recall/mute/bye without AI; parser, pronoun and error tests | verified on desktop: pending Claude |
+| Tool registry | safe/confirm/blocked, two execution rounds, actual results fed back, authoritative mutation acknowledgements and failure tests | verified on desktop: pending Claude |
+| Continuity | Last 12 messages, 8 memories, 3 summaries; replaceable retrieval interface; archive/summary/retention/deletion tests | verified on desktop: pending Claude |
+| Settings | Memory add/edit/category/delete; archive View/Export/Delete/Delete all; Forget everything includes stats | verified on desktop: pending Claude |
+| Animation | Ten adapter conversation states, SVG/CSS placeholder poses; shared shoulder pivots fix stretch detachment | verified on desktop: pending Claude |
+| Idle resources | No new continuous idle loop, daily purge only, timers cancelled, ambient AI suspended during summary | verified on desktop: pending Claude |
+
+Round 2 automated checks: typecheck passed; 620 tests passed, two opt-in/manual tests skipped;
+production build passed. The existing Vite CommonJS/config-loader future warning
+is non-fatal. No dependency added, external service used, or commit created.
+
+Desktop acceptance still needs Windows focus return, shortcut conflicts, reading
+panel/input layout near edges and on mixed-DPI monitors, real qwen3:8b general/code/
+brainstorm replies, restart continuity, stopped-Ollama behavior, every animation
+state screenshot and idle CPU. Round 2 removes native HWND capture/restore;
+Windows selects the next window in z-order on close. Mocks do not prove activation. Summary failures
+preserve user-derived topics. Retention/deletion cannot erase exported copies or
+external backups. Earlier milestone double-click instructions are superseded:
+double-click now opens conversation, with Settings available in native menus.
+
 ## Milestone 3 - Give Ducky a personality (2026-11-25)
 
 | Feature | Implemented | Unit-tested | Verified-on-desktop |

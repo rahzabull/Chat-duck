@@ -37,7 +37,7 @@ let window: ReturnType<typeof fakeWindow>;
 function fakeWindow() {
   return Object.assign(new EventEmitter(), {
     webContents: Object.assign(new EventEmitter(), { send: vi.fn() }),
-    isDestroyed: () => false, setBounds: vi.fn(), setAlwaysOnTop: vi.fn(), showInactive: vi.fn(), hide: vi.fn(), setIgnoreMouseEvents: vi.fn(),
+    isDestroyed: () => false, setFocusable: vi.fn(), setBounds: vi.fn(), setAlwaysOnTop: vi.fn(), showInactive: vi.fn(), hide: vi.fn(), setIgnoreMouseEvents: vi.fn(),
   });
 }
 function create(patch: Partial<Settings> = {}) {
@@ -60,6 +60,29 @@ beforeEach(() => {
 afterEach(() => { controller?.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('controller personality wiring', () => {
+  it('suppresses sleep, walking, activities and speech while reading and for 60 seconds afterwards', () => {
+    create({ walking: true, appAwareness: true }); controller.beginConversation(); driver.idle = 3600;
+    const internals = controller as unknown as { performActivity(b: Behaviour): void; saySituation(s: Situation): boolean; body: { walking: boolean } };
+    function assertQuiet() {
+      controller.checkIdle(); controller.events.emit('USER_BECAME_IDLE', undefined);
+      internals.performActivity('walk_left'); internals.performActivity('dance');
+      driver.sample({ app: { name: 'Chrome', category: 'browser' }, fullscreen: false });
+      expect(internals.saySituation('first_launch')).toBe(false);
+      expect(controller.state.sleeping).toBe(false); expect(controller.state.animation).toBe('idle');
+      expect(internals.body.walking).toBe(false); expect(controller.state.bubble).toBeNull();
+    }
+    vi.advanceTimersByTime(120000); assertQuiet();
+    controller.finishConversation(); vi.advanceTimersByTime(59999); assertQuiet();
+    vi.advanceTimersByTime(1); controller.checkIdle(); expect(controller.state.sleeping).toBe(true);
+  });
+  it('yields focus without running the companion hide/close handler', () => {
+    create(); controller.beginConversation(); const close = vi.fn(); controller.onConversationClose = close;
+    window.hide.mockImplementation(() => { window.emit('hide'); });
+    controller.releaseConversationFocus();
+    expect(window.setFocusable).toHaveBeenCalledWith(false); expect(window.hide).toHaveBeenCalledOnce();
+    expect(window.showInactive).toHaveBeenCalled(); expect(window.setAlwaysOnTop).toHaveBeenLastCalledWith(true, 'screen-saver');
+    expect(controller.state.visible).toBe(true); expect(close).not.toHaveBeenCalled();
+  });
   it('shows the first-launch follow-up and cancels it immediately on pointer down', () => {
     create({ firstLaunchDone: false }); expect(controller.state.bubble).toBe('Hello. I live here now.');
     vi.advanceTimersByTime(1500); expect(controller.state.bubble).toContain('judging quietly');

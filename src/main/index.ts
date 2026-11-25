@@ -1,4 +1,6 @@
-import { app, BrowserWindow, powerMonitor, screen } from 'electron';
+import { ConversationController } from './conversation/controller';
+import { ConversationStore } from './conversation/store';
+import { app, globalShortcut, BrowserWindow, powerMonitor, screen } from 'electron';
 import { join } from 'node:path';
 import { CHANNELS } from '../shared/constants';
 import type { Command, CompanionState } from '../shared/types';
@@ -11,6 +13,7 @@ import { createCompanion, createSettings, secureSession } from './windows';
 
 app.setName('Ducky');
 app.commandLine.appendSwitch('disable-background-networking');
+let conversation: ConversationController | undefined;
 let controller: CompanionController | undefined;
 let settingsWindow: BrowserWindow | undefined;
 let tray: DuckyTray | undefined;
@@ -19,7 +22,9 @@ let quitting = false;
 
 function broadcast(state: CompanionState): void {
   for (const window of [controller?.window, settingsWindow]) {
-    if (window && !window.isDestroyed() && !window.webContents.isLoadingMainFrame()) window.webContents.send(CHANNELS.state, state);
+    if (window && !window.isDestroyed() && !window.webContents.isLoadingMainFrame()) {
+      window.webContents.send(CHANNELS.state, window === controller?.window ? { ...state, library: undefined } : state);
+    }
   }
 }
 function showSettings(): void {
@@ -32,6 +37,7 @@ function showSettings(): void {
 function command(command: Command): void {
   if (!controller) return;
   switch (command) {
+    case 'talk': void conversation?.open(); break;
     case 'show': controller.setVisible(true); break;
     case 'hide': controller.setVisible(false); break;
     case 'pause': controller.togglePause(); break;
@@ -48,7 +54,7 @@ function cleanup(): void {
   screen.removeListener('display-removed', displayChanged);
   screen.removeListener('display-metrics-changed', displayChanged);
   powerMonitor.removeListener('resume', resumed);
-  disposeIPC?.(); controller?.dispose(); tray?.dispose();
+  disposeIPC?.(); conversation?.dispose(); globalShortcut.unregisterAll(); controller?.dispose(); tray?.dispose();
   for (const window of BrowserWindow.getAllWindows()) window.destroy();
 }
 function displayChanged(): void { controller?.recover('display configuration changed'); }
@@ -66,13 +72,15 @@ else {
     secureSession();
     const store = new SettingsStore(join(app.getPath('userData'), 'settings.json'));
     controller = new CompanionController(createCompanion(), store, broadcast, new MemoryStore(join(app.getPath('userData'), 'memory.json'), store.value.memoryEnabled));
+    conversation = new ConversationController(controller, new ConversationStore(app.getPath('userData'), store.value.memoryEnabled, store.value.conversationRetention));
+    controller.onConversationClose = () => conversation?.end();
     tray = new DuckyTray(() => controller!.state, command);
     let menuKey = '';
     controller.onChanged = () => {
       const state = controller!.state; const key = `${state.visible}:${state.paused}:${state.settings.mute}`;
       if (key !== menuKey) { menuKey = key; tray?.refresh(); }
     };
-    disposeIPC = registerIPC(controller, () => settingsWindow, command, () => tray?.popup());
+    disposeIPC = registerIPC(controller, () => settingsWindow, command, () => tray?.popup(), conversation);
     screen.on('display-added', displayChanged); screen.on('display-removed', displayChanged);
     screen.on('display-metrics-changed', displayChanged); powerMonitor.on('resume', resumed);
     console.log('[ducky] Started Milestone 1', app.getVersion());
