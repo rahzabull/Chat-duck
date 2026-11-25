@@ -6,12 +6,13 @@ export function needsClarification(text: string): boolean {
   const visible = text.replace(/[\p{White_Space}\p{Cf}]/gu, '');
   return !/\p{L}/u.test(visible) || [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(visible)].length < 2;
 }
-export const CONVERSATION_SCHEMA = {
+export const conversationSchema = (names: readonly string[] = TOOL_NAMES) => ({
   type: 'object', additionalProperties: false, required: ['reply', 'tone', 'tool'],
   properties: { reply: { type: 'string' }, tone: { type: 'string', enum: TONES }, tool: { anyOf: [
-    { type: 'null' }, { type: 'object', additionalProperties: false, required: ['name', 'args'], properties: { name: { type: 'string', enum: TOOL_NAMES }, args: { type: 'object' } } },
+    { type: 'null' }, { type: 'object', additionalProperties: false, required: ['name', 'args'], properties: { name: { type: 'string', enum: names }, args: { type: 'object' } } },
   ] } },
-};
+});
+export const CONVERSATION_SCHEMA = conversationSchema();
 export function validateReply(raw: string, names: readonly string[] = TOOL_NAMES): Reply {
   if (raw.length > 24000) throw new Error('Invalid response');
   const value: unknown = JSON.parse(raw);
@@ -25,7 +26,7 @@ export function validateReply(raw: string, names: readonly string[] = TOOL_NAMES
 /** Guard obvious ungrounded external-action acknowledgements, not authored code/prose. */
 export function unverifiedActionClaim(text: string): boolean {
   const prose = text.replace(/```[\s\S]*?```|`[^`]*`/g, '');
-  return /\bI(?:'ve|’ve| have)?\s+(?:(?:successfully|already|just)\s+)?(?:saved|stored|remembered|deleted|removed|forgotten|sent|emailed|booked|scheduled|installed|downloaded|uploaded|opened|browsed)\b/i.test(prose)
+  return /\bI(?:'ve|’ve| have)?\s+(?:(?:successfully|already|just)\s+)?(?:saved|stored|remembered|deleted|removed|forgotten|sent|emailed|booked|scheduled|installed|downloaded|uploaded|opened|browsed|created|added|updated|completed|rescheduled|snoozed|started|stopped)\b/i.test(prose)
     || /\bI(?:'ll|’ll| will) remember\b/i.test(prose)
-    || /\b(?:memory|reminder|email|file|appointment)\s+(?:(?:has been|was|is)\s+)?(?:saved|deleted|sent|scheduled|created)\b/i.test(prose);
+    || /\b(?:memory|reminder|email|file|appointment|task|note|timer)\s+(?:(?:has been|was|is)\s+)?(?:saved|deleted|sent|scheduled|created|added|updated|completed|snoozed|started|stopped)\b/i.test(prose);
 }

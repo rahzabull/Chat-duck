@@ -8,6 +8,8 @@ function subscribe<T>(channel: string, callback: (payload: T) => void): () => vo
   return () => ipcRenderer.removeListener(channel, listener);
 }
 const api: DuckyAPI = {
+  productivity: action => ipcRenderer.invoke(CHANNELS.productivity, action),
+  talkSave: pinned => ipcRenderer.invoke(CHANNELS.talkSave, pinned),
   talkCopy: () => ipcRenderer.invoke(CHANNELS.talkCopy),
   talkSend: text => ipcRenderer.invoke(CHANNELS.talkSend, text),
   talkEnd: () => ipcRenderer.invoke(CHANNELS.talkEnd),

@@ -41,6 +41,9 @@ export class PlaceholderDuck implements CharacterSurface {
           <g class="hat" fill="#318453"><path data-duck-hit d="M130 172l7-29q22-12 43 0l7 29Z"/><ellipse data-duck-hit cx="158" cy="172" rx="43" ry="8" fill="#246c44"/><path d="M135 158q23 7 47 0" fill="none" stroke="#9ac675" stroke-width="5"/></g>
         </g>
       </g></g>
+      <g class="alarm-clock"><circle cx="217" cy="235" r="21" fill="#fff6da" stroke="#37845a" stroke-width="5"/><path d="M217 220v15l9 5M197 217l-5-6M234 217l5-6" stroke="#344e44" stroke-width="4" fill="none"/><circle cx="217" cy="235" r="3" fill="#344e44"/></g>
+      <g class="focus-laptop"><path d="M123 250h74l-7 34h-59Z" fill="#63877b" stroke="#2c4d41" stroke-width="3"/><path d="M118 285h84" stroke="#2c4d41" stroke-width="5"/><circle cx="160" cy="268" r="5" fill="#fff6da"/></g>
+      <g class="celebrate-confetti" stroke-width="5"><path d="M80 180l5 10M215 150l6-5M120 120l-4 10" stroke="#e38e3b"/><path d="M200 110l-7 9M89 138l8 4M242 193l-5 6" stroke="#4b9b77"/></g>
       <g class="placard"><path d="M219 282v-68" stroke="#9f703f" stroke-width="5"/><rect x="188" y="186" width="100" height="39" rx="3" fill="#fff6d8" stroke="#95744a" stroke-width="2"/><text x="238" y="211" text-anchor="middle" fill="#38382d" font-family="sans-serif" font-size="14" font-weight="bold">ON STRIKE</text></g>
       <g class="visitor"><g transform="translate(0 168) scale(.43)"><ellipse cx="140" cy="280" rx="42" ry="11" fill="#b47d36"/><ellipse cx="140" cy="246" rx="47" ry="34" fill="#939d9c"/><ellipse cx="146" cy="202" rx="37" ry="35" fill="#bac2bf"/><ellipse cx="174" cy="216" rx="20" ry="8" fill="#daa34b"/><circle cx="158" cy="195" r="7" fill="white"/><circle cx="160" cy="196" r="3" fill="#26302f"/><ellipse cx="117" cy="245" rx="12" ry="23" fill="#75817e"/></g></g>
       <g class="zzz" fill="#385d4b" font-family="sans-serif" font-weight="bold"><text x="218" y="170" font-size="18">z</text><text x="238" y="148" font-size="23">z</text></g>
@@ -58,7 +61,7 @@ export class PlaceholderDuck implements CharacterSurface {
     this.animation = animation; this.root.dataset.animation = animation;
     this.stopBreath(); this.scheduleBreath();
     if (this.completion) clearTimeout(this.completion); this.completion = undefined;
-    const durations: Record<string, number | undefined> = { ...ACTIVITY_DURATION, sunglasses: 2000, blink: 150, startled: 650, landing: 430, waking_up: 900, angry: 750, happy: 750, look_left: 1500, look_right: 1500 };
+    const durations: Record<string, number | undefined> = { ...ACTIVITY_DURATION, alarm: 3000, celebrate: 1200, sunglasses: 2000, blink: 150, startled: 650, landing: 430, waking_up: 900, angry: 750, happy: 750, look_left: 1500, look_right: 1500 };
     if (durations[animation] && this.visible && !this.paused) this.completion = setTimeout(() => {
       this.completion = undefined; this.listeners.forEach(callback => callback(animation));
     }, durations[animation]);

@@ -1,4 +1,5 @@
 import { CATEGORIES } from '../../core/conversation/types';
+import { validAction } from '../../core/productivity/validation';
 import { isRecord } from './settings';
 import { CHANNELS } from '../constants';
 import { ANIMATION_IDS } from '../../animation/adapter';
@@ -11,6 +12,8 @@ const empty = new Set<string>([
 export function validatePayload(channel: string, value: unknown): boolean {
   if (empty.has(channel)) return value === undefined;
   switch (channel) {
+    case CHANNELS.productivity: return validAction(value);
+    case CHANNELS.talkSave: return typeof value === 'boolean';
     case CHANNELS.talkSend: return typeof value === 'string' && value.trim().length > 0 && value.length <= 4000;
     case CHANNELS.talkPanel: return typeof value === 'boolean';
     case CHANNELS.libraryAction: {
@@ -23,7 +26,7 @@ export function validatePayload(channel: string, value: unknown): boolean {
       return value.action === 'add' ? keys === 'action,category,text' : id && keys === 'action,category,id,text';
     }
     case CHANNELS.updateSettings: return isSettingsPatch(value);
-    case CHANNELS.command: return ['talk', 'show', 'hide', 'pause', 'mute', 'reset', 'settings', 'quit'].includes(value as string);
+    case CHANNELS.command: return ['talk', 'tasks', 'add-task', 'add-reminder', 'focus', 'notes', 'show', 'hide', 'pause', 'mute', 'reset', 'settings', 'quit'].includes(value as string);
     case CHANNELS.hitTest:
     case CHANNELS.hover: return typeof value === 'boolean';
     case CHANNELS.dragStart: return isPoint(value);

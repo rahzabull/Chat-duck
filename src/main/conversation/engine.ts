@@ -2,7 +2,7 @@ import type { AIProvider, AIRequest } from '../../ai/providers';
 import { PRESETS } from '../../core/dialogue/presets';
 import { disallowedModelOutput, DisallowedOutputError } from '../../core/content-safety';
 import { TALK_LINES } from '../../core/dialogue/lines';
-import { CONVERSATION_SCHEMA, unverifiedActionClaim, validateReply } from '../../core/conversation/validation';
+import { conversationSchema, unverifiedActionClaim, validateReply } from '../../core/conversation/validation';
 import type { Reply, Turn, ToolCall } from '../../core/conversation/types';
 import type { Settings } from '../../shared/types';
 import { MAX_TOOL_ROUNDS, type ToolRegistry, type ToolResult } from '../tools';
@@ -44,11 +44,11 @@ export class ConversationEngine {
     this.cancel(); const controller = new AbortController(); this.pending = controller;
     const messages: AIRequest['messages'][number][] = [{ role: 'system', content: conversationPrompt(context, this.registry) }, ...context.turns.slice(-12).map(t => ({ role: t.role, content: t.text }))];
     if (confirmed) messages.push({ role: 'system', content: `TOOL_RESULT ${JSON.stringify(confirmed)}` });
-    let round = confirmed ? 1 : 0; let lastResult: ToolResult | undefined = confirmed?.result; let mutation = !!confirmed && ['remember', 'forget'].includes(confirmed.call.name);
+    let round = confirmed ? 1 : 0; let lastResult: ToolResult | undefined = confirmed?.result; let mutation = !!confirmed;
     let safetyRetries = 0;
     try {
       for (;;) {
-        const raw = await this.generate({ model: context.settings.aiModel, messages, conversation: true, format: CONVERSATION_SCHEMA }, controller);
+        const raw = await this.generate({ model: context.settings.aiModel, messages, conversation: true, format: conversationSchema(this.registry.names) }, controller);
         if (controller.signal.aborted) throw new Error('Cancelled');
         let value: Reply;
         try { value = validateReply(raw, this.registry.names); }
@@ -68,7 +68,7 @@ export class ConversationEngine {
         if (result.confirmation) return { reply: result.message, tone: 'unsure', tool: null, confirmation: result.confirmation };
         // Failure bypasses the model: it cannot turn an unsuccessful write into a success claim.
         if (!result.ok) return { reply: result.message, tone: 'unsure', tool: null };
-        lastResult = result; mutation = ['remember', 'forget'].includes(value.tool.name);
+        lastResult = result; mutation = !['recall_memories', 'recall_conversations', 'list_tasks', 'list_reminders', 'search_notes', 'focus_status'].includes(value.tool.name);
         messages.push({ role: 'assistant', content: raw }, { role: 'system', content: `TOOL_RESULT (authoritative): ${JSON.stringify(result)}. Explain this actual result; never claim other actions.` });
       }
     } catch (error) {

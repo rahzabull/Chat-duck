@@ -22,3 +22,20 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
 .reading-content code { background: #eaf0e4; font-size: 12px; }
 #reading-panel[hidden], #talk-input[hidden] { display: none; }
 .reduced #talk-input { transition: none; }
+#productivity-card, #focus-badge { position: absolute; z-index: 4; background: #fffef3; color: #29382c; border: 1px solid #aabda5; border-radius: 14px; box-shadow: 0 3px 8px #0002; padding: 10px; font: 14px/1.4 "Segoe UI", sans-serif; user-select: text; overflow: auto; overflow-wrap: anywhere; }
+#productivity-card { max-width: 420px; max-height: 420px; }
+#productivity-card[hidden], #focus-badge[hidden] { display: none; }
+#productivity-card header, #productivity-card nav, #focus-badge { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#productivity-card header { justify-content: space-between; }
+#productivity-card input:not([type=checkbox]), #productivity-card textarea { width: 100%; min-width: 0; border: 1px solid #b6c4ae; border-radius: 6px; padding: 6px; margin: 4px 0; background: white; color: inherit; font: inherit; user-select: text; }
+#productivity-card textarea { min-height: 90px; resize: vertical; }
+#productivity-card article { border-top: 1px solid #d9e1d0; padding: 8px 0; }
+#productivity-card button, #productivity-card select, #focus-badge button { border: 1px solid #bbcbb1; border-radius: 6px; padding: 4px 7px; margin: 3px 2px; background: #eef4e7; color: inherit; cursor: pointer; font: inherit; }
+#productivity-card button[aria-pressed=true] { background: #d4e8c6; }
+#productivity-card :focus-visible, #focus-badge :focus-visible { outline: 2px solid #23734a; outline-offset: 1px; }
+#productivity-card .task-title { display: flex; gap: 6px; align-items: center; }
+#productivity-card p { margin: 6px 0; } #productivity-card details { margin: 6px 0; }
+#productivity-card summary { cursor: pointer; } #productivity-card label { display: block; }
+#focus-badge { border-radius: 20px; padding: 3px 8px; font-size: 12px; }
+.productivity-open #reading-panel { display: none; }
+.productivity-open #bubble { display: none; }

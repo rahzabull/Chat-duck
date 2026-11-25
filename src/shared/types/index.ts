@@ -36,6 +36,8 @@ export interface BrainState {
   sample?: string;
 }
 export interface CompanionState {
+  productivity?: import('../../core/productivity/types').ProductivityView;
+  productivitySpeech?: string;
   conversation?: import('../../core/conversation/types').ConversationView;
   library?: { memories: import('../../core/conversation/types').UserMemory[]; conversations: import('../../core/conversation/types').Conversation[] };
   visible: boolean; paused: boolean; sleeping: boolean; dragging: boolean;
@@ -46,8 +48,10 @@ export interface CompanionState {
   bubble: string | null; settings: Settings; debugHitbox: boolean; version: string;
 }
 export interface CursorUpdate { cursor: Point; origin: Point }
-export type Command = 'talk' | 'show' | 'hide' | 'pause' | 'mute' | 'reset' | 'settings' | 'quit';
+export type Command = 'talk' | 'tasks' | 'add-task' | 'add-reminder' | 'focus' | 'notes' | 'show' | 'hide' | 'pause' | 'mute' | 'reset' | 'settings' | 'quit';
 export interface DuckyAPI {
+  productivity(action: import('../../core/productivity/types').ProductivityAction): Promise<import('../../core/productivity/types').ProductivityResult>;
+  talkSave(pinned: boolean): Promise<import('../../core/productivity/types').ProductivityResult>;
   talkCopy(): Promise<void>;
   talkSend(text: string): Promise<void>;
   talkEnd(): Promise<void>;

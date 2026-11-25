@@ -1,5 +1,41 @@
 # Privacy
 
+## Expansion Phase B: productivity data
+
+Tasks, reminders and notes are user-owned data, separate from companion memory.
+They work when memory and AI are disabled. Neither **Forget everything**, memory
+disable, nor conversation retention deletes them. Settings > Productivity offers
+separate confirmed Delete all tasks / reminders / notes and exports to `.json`
+or plain `.txt` through the system save dialog.
+
+Local plaintext files in Electron `userData` (normally `%APPDATA%/Ducky`):
+
+| File | Contents |
+| --- | --- |
+| tasks.json | Titles, optional notes/due date/time/category, priority, subtasks, completion and creation/update timestamps |
+| reminders.json | Text, next time, recurrence, snooze, delivery marker, state, creation time, timezone and original local wall-time anchor |
+| notes.json | Text, optional title/topic, pinned status and creation/update timestamps; reading-panel Save/Pin use topic `saved` |
+| focus.json | Notification/snooze and focus/break defaults; completed-session history only when enabled, default off |
+
+Files use versioned envelopes, validated content and atomic replacement. Corrupt
+files are preserved as timestamped `.corrupt-*` backups for recovery; normal
+delete-all clears the active file, not those backups or exported copies. Remove
+unwanted backups/exports separately. Active focus sessions are not persisted and
+restart ends them. Disabling focus history clears previously saved history.
+
+No task, reminder or note is observed from the desktop automatically. Local
+commands need no model. When AI is enabled, explicit conversational requests and
+their tool results can enter the existing loopback Ollama conversation context.
+No new network service, telemetry, OS alarm service or external storage is added.
+Optional Windows notifications (on by default) show reminder text using Electron
+Notification; the OS controls their visibility and history. Turn them off in
+Productivity settings if that text should stay inside Ducky's card.
+
+Reminders only fire while Ducky is running. On return from sleep or a closed app,
+missed reminders are presented once and recurring schedules skip to the next
+future occurrence. A persisted delivery marker prevents duplicate notifications
+after restart. The reminder scheduler is independent of hiding/muting Ducky.
+
 ## Expansion Phase A: explicit memories and conversations
 
 This extends the M3-only description below. M3 `memory.json` keeps its interaction

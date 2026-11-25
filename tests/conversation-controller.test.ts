@@ -7,6 +7,8 @@ import { registerIPC } from '../src/main/ipc';
 import { CHANNELS } from '../src/shared/constants';
 import { ConversationController } from '../src/main/conversation/controller';
 import { ConversationStore } from '../src/main/conversation/store';
+import { ProductivityService } from '../src/main/productivity/service';
+import { ProductivityStore } from '../src/main/productivity/store';
 import type { CompanionController } from '../src/main/companion/CompanionController';
 import type { CompanionState } from '../src/shared/types';
 import { DEFAULT_SETTINGS } from '../src/shared/schemas/settings';
@@ -17,7 +19,7 @@ const ipc = vi.hoisted(() => ({ handle: vi.fn(), on: vi.fn(), removeHandler: vi.
 vi.mock('electron', () => ({ ipcMain: ipc, clipboard: { writeText: vi.fn() }, dialog: { showSaveDialog: vi.fn(async () => ({ canceled: true })) }, globalShortcut: { register: driver.register, unregister: driver.unregister } }));
 vi.mock('../src/ai/ollama', () => ({ OllamaError: class extends Error { reason = 'Not running'; }, OllamaProvider: class { generate = driver.generate; cancel = driver.cancel; } }));
 let directory: string; let service: ConversationController; let store: ConversationStore;
-function setup(aiEnabled = false) {
+function setup(aiEnabled = false, productivity?: ProductivityService) {
   const calls: string[] = [];
   const call = (name: string) => vi.fn(() => { calls.push(name); });
   const window = Object.assign(new EventEmitter(), { calls, setFocusable: vi.fn((value: boolean) => { calls.push(`focusable:${value}`); }), focus: call('focus'), show: call('show'), hide: call('hide'), showInactive: call('showInactive'), setAlwaysOnTop: vi.fn((_value: boolean, _level: string) => { calls.push('topmost'); }), moveTop: call('moveTop'), webContents: { focus: call('contents.focus') }, isFocused: () => driver.focused });
@@ -26,7 +28,7 @@ function setup(aiEnabled = false) {
     setConversationInference: vi.fn(), beginConversation: vi.fn(), finishConversation: vi.fn(), muteFor: vi.fn(),
     presentConversation: vi.fn((view: NonNullable<CompanionState['conversation']>) => { companion.state.conversation = view; calls.push(view.inputReady ? 'renderer:focus' : 'renderer:waiting'); }),
   };
-  store = new ConversationStore(directory, true, '7 days'); service = new ConversationController(companion as unknown as CompanionController, store);
+  store = new ConversationStore(directory, true, '7 days'); service = new ConversationController(companion as unknown as CompanionController, store, productivity);
   return companion;
 }
 beforeEach(() => {
@@ -35,6 +37,24 @@ beforeEach(() => {
 });
 afterEach(() => { service?.dispose(); rmSync(directory, { recursive: true, force: true }); vi.useRealTimers(); });
 describe('conversation main controller', () => {
+  it('routes productivity ahead of AI and leaves user data intact when memory is forgotten', async () => {
+    const data = new ProductivityStore(directory); const productivity = new ProductivityService(data, { changed: vi.fn(), attention: vi.fn(), notify: vi.fn(), export: vi.fn(), doNotDisturb: () => false });
+    const companion = setup(false, productivity); service.open();
+    let pending = service.send('add bread tomorrow'); await vi.advanceTimersByTimeAsync(300); await pending;
+    expect(data.tasks.value[0].title).toBe('bread'); expect(companion.state.conversation?.reply).toBe('Added: bread');
+    pending = service.send('remember this idea campaign ducks'); await vi.advanceTimersByTimeAsync(300); await pending;
+    expect(data.notes.value[0].text).toBe('campaign ducks'); expect(store.memories).toEqual([]); expect(driver.generate).not.toHaveBeenCalled();
+    expect(productivity.view.card).toBe('notes'); await service.send('Hello again'); expect(productivity.view.card).toBeNull();
+    service.forgetEverything(); expect(data.tasks.value).toHaveLength(1); expect(data.notes.value).toHaveLength(1); productivity.dispose();
+  });
+  it('saves a reading reply as a note and Pin updates the same saved output', async () => {
+    const data = new ProductivityStore(directory); const productivity = new ProductivityService(data, { changed: vi.fn(), attention: vi.fn(), notify: vi.fn(), export: vi.fn(), doNotDisturb: () => false });
+    setup(true, productivity); service.open(); const text = 'An explanation of campaign planning. '.repeat(20);
+    driver.generate.mockResolvedValueOnce(JSON.stringify({ reply: text, tone: 'explaining', tool: null })); await service.send('Help me plan a campaign');
+    let pending = service.saveOutput(false); await vi.advanceTimersByTimeAsync(300); expect((await pending).ok).toBe(true);
+    pending = service.saveOutput(true); await vi.advanceTimersByTimeAsync(300); expect((await pending).ok).toBe(true);
+    expect(data.notes.value).toHaveLength(1); expect(data.notes.value[0]).toMatchObject({ text: text.trim(), topic: 'saved', pinned: true }); productivity.dispose();
+  });
   it.each(['Esc', 'bye', 'blur-timeout', 'inactivity-timeout'])('uses the same complete close path for %s', async path => {
     const companion = setup(); service.open();
     const end = vi.spyOn(service, 'end');

@@ -1,4 +1,5 @@
 export interface Rect { x: number; y: number; width: number; height: number }
+export type ReturnLayout = ReturnType<typeof conversationLayout>['layout'];
 /** Union the original duck with a temporary response surface; feet never move. */
 export function conversationLayout(base: Rect, area: Rect, panel: boolean) {
   const width = Math.min(panel ? 420 : 300, area.width);

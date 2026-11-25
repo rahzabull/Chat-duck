@@ -10,6 +10,7 @@ import type { SettingsStore } from '../src/main/settings/store';
 import type { Point, Settings } from '../src/shared/types';
 import { DEFAULT_SETTINGS, parseSettings } from '../src/shared/schemas/settings';
 import { CompanionController } from '../src/main/companion/CompanionController';
+import { FOCUS_DEFAULTS, type ProductivityView } from '../src/core/productivity/types';
 import type { Situation } from '../src/core/dialogue';
 const driver = vi.hoisted(() => ({
   point: { x: 1736, y: 1030 }, idle: 0,
@@ -60,6 +61,17 @@ beforeEach(() => {
 afterEach(() => { controller?.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('controller personality wiring', () => {
+  it('anchors productivity cards and keeps focus quiet while reminders can turn and alarm', () => {
+    create({ mute: true, talkativeness: 'quiet' });
+    const base = window.setBounds.mock.calls.at(-1)![0];
+    const view: ProductivityView = { revision: 1, card: 'tasks', tasks: [], notes: [], reminders: [], settings: { ...FOCUS_DEFAULTS }, queue: 0, message: '', focus: { paused: false, endAt: Date.now() + 60000, remaining: 60000, startedAt: Date.now(), minutes: 1, kind: 'focus' } };
+    controller.presentProductivity(view); const bounds = window.setBounds.mock.calls.at(-1)![0]; const layout = controller.state.productivity!.layout!;
+    expect(bounds.y + layout.y + layout.height).toBe(base.y + base.height); expect(layout.contentWidth).toBeLessThanOrEqual(420);
+    driver.idle = 3600; controller.checkIdle(); expect(controller.state.sleeping).toBe(false); expect(controller.state.animation).toBe('focus');
+    controller.productivityAttention('alarm', 'reminder_due'); expect(controller.state.animation).toBe('alarm'); expect(controller.state.direction).toBe('left'); expect(controller.state.productivitySpeech).toBeTruthy();
+    vi.advanceTimersByTime(3000); expect(controller.state.animation).toBe('focus');
+    controller.productivityAttention('celebrate', 'task_done'); expect(controller.state.productivitySpeech).not.toContain('shit');
+  });
   it('suppresses sleep, walking, activities and speech while reading and for 60 seconds afterwards', () => {
     create({ walking: true, appAwareness: true }); controller.beginConversation(); driver.idle = 3600;
     const internals = controller as unknown as { performActivity(b: Behaviour): void; saySituation(s: Situation): boolean; body: { walking: boolean } };

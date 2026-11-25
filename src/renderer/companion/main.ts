@@ -1,4 +1,5 @@
 import { ConversationUI } from './conversation';
+import { ProductivityUI } from './productivity';
 import { guardedReply } from '../../core/conversation/output';
 import { PlaceholderDuck } from '../../animation/placeholder';
 import type { CharacterSurface } from '../../animation/adapter';
@@ -10,6 +11,7 @@ const bubble = document.getElementById('bubble') as HTMLButtonElement;
 const adapter: CharacterSurface = new PlaceholderDuck(host);
 const api = window.ducky;
 const conversation = new ConversationUI(host, bubble, adapter);
+const productivity = new ProductivityUI(host);
 const reducedPreference = matchMedia('(prefers-reduced-motion: reduce)');
 let state: CompanionState | undefined;
 let captured: number | undefined;
@@ -24,7 +26,7 @@ function reportHit(x: number, y: number, force = false): void {
   const duck = adapter.hitTest(x, y);
   const element = document.elementFromPoint(x, y);
   const onBubble = !bubble.hidden && !!element && bubble.contains(element);
-  const hit = captured !== undefined || duck || onBubble || conversation.hit(element);
+  const hit = captured !== undefined || duck || onBubble || conversation.hit(element) || productivity.hit(element);
   if (force || hit !== interactive) { interactive = hit; api.hitTest(hit); }
   if (hovering !== duck) { hovering = duck; api.hover(duck); }
 }
@@ -40,9 +42,11 @@ function render(next: CompanionState): void {
   adapter.setMovementSpeed(next.movementSpeed); adapter.setDebugHitbox(next.debugHitbox);
   if (!previous || previous.animationRevision !== next.animationRevision) adapter.play(next.animation);
   const conversing = conversation.render(next);
+  productivity.render(next);
   if (!conversing) adapter.setTalking(!!next.bubble); adapter.setSunglasses(next.sunglasses);
   if (!conversing) bubble.textContent = guardedReply(next.bubble ?? '');
   if (!conversing) bubble.hidden = !next.bubble; bubble.classList.toggle('debug', next.debugHitbox);
+  if (next.productivitySpeech) { bubble.textContent = next.productivitySpeech; bubble.hidden = false; }
   if (lastCursor) adapter.setEyeTarget(lastCursor.cursor.x - lastCursor.origin.x, lastCursor.cursor.y - lastCursor.origin.y);
   if (((wasDragging && !next.dragging) || !next.visible || next.paused) && captured !== undefined) releaseCapture();
   reportHit(lastPointer.x, lastPointer.y, wasDragging !== next.dragging);
@@ -98,5 +102,5 @@ reducedPreference.addEventListener('change', preferenceChanged);
 void api.getState().then(render).catch(error => console.error('Ducky initialization failed', error));
 window.addEventListener('beforeunload', () => {
   unsubscribeState(); unsubscribeCursor(); unsubscribePosition(); unsubscribeCompletion();
-  reducedPreference.removeEventListener('change', preferenceChanged); conversation.dispose(); adapter.dispose();
+  reducedPreference.removeEventListener('change', preferenceChanged); conversation.dispose(); productivity.dispose(); adapter.dispose();
 });

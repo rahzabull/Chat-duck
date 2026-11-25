@@ -1,5 +1,29 @@
 # Character animation contract
 
+## Expansion Phase B productivity states
+
+The adapter `play` allowlist now includes these IDs. Renderer business logic must
+continue to use CharacterSurface rather than inspect SVG internals.
+
+| ID | Placeholder | Lifetime / priority |
+| --- | --- | --- |
+| `alarm` | Tiny held clock; bounded ringing wiggle | 3 seconds, then prior focus/idle pose; main turns toward the screen-centre side without walking |
+| `focus` | Seated duck with a tiny laptop | Mostly static for the focus or break session; no continuous CSS loop |
+| `celebrate` | Small CSS confetti burst | 1.2 seconds, with a roughly one-second burst; task completion or focus end |
+
+Reduced motion shows static props/confetti. Alarm and celebration completion use
+the existing animation-complete callback. Focus stops when its timer is stopped or
+completed. Reminders may temporarily replace focus; focus resumes afterwards.
+No new idle animation timer is introduced. The one-second focus countdown is a
+renderer badge timer, present only for a running, unpaused focus/break session.
+
+Authored sets live in `core/productivity/lines.ts`: seven `reminder_due` lines,
+clean `task_done` variants, a separate profanity-enabled completion line, and
+`focus_done` lines. They bypass the ambient model. Missed delivery prepends
+“You missed this while I was asleep: …”. The stronger task-completion line is
+selected only with profanity enabled; it does not broaden model profanity rules.
+Desktop screenshots and reduced-motion verification: pending Claude.
+
 ## Expansion Phase A conversation layer (animator handoff)
 
 `setConversationState(state: ConversationState | null)` is independent of `play`.

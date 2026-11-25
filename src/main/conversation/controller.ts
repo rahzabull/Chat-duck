@@ -13,6 +13,7 @@ import { ToolRegistry } from '../tools';
 import { needsClarification } from '../../core/conversation/validation';
 import { ConversationEngine } from './engine';
 import { ConversationStore } from './store';
+import type { ProductivityService } from '../productivity/service';
 const line = (kind: keyof typeof TALK_LINES): string => { const pool = TALK_LINES[kind]; return pool[Math.floor(Math.random() * pool.length)]; };
 export class ConversationController {
   private view: ConversationView = { active: false, state: null, reply: '', revision: 0, panel: false, shortcutError: '' };
@@ -25,8 +26,10 @@ export class ConversationController {
   private summaryEpoch = 0;
   private lastSaved?: string; private choices?: UserMemory[]; private confirmation?: ToolCall;
   private registered = ''; private config = '';
-  constructor(private companion: CompanionController, readonly store: ConversationStore) {
+  private savedOutput?: { text: string; id: string };
+  constructor(private companion: CompanionController, readonly store: ConversationStore, private productivity?: ProductivityService) {
     this.registry = new ToolRegistry([
+      ...(productivity?.tools ?? []),
       { name: 'remember', description: 'remember(text:string, category:about_me|preference|project|idea|other), only with explicit user approval', permission: 'confirm', validate: a => typeof a.text === 'string' && a.text.length > 0 && a.text.length <= 4000 && (a.category === undefined || CATEGORIES.includes(a.category as Category)), execute: a => {
         const m = store.add(a.text as string, (a.category as Category) ?? 'other'); this.lastSaved = m.id; return { ok: true, message: `Saved: ${flipPronouns(m.text)}`, data: m };
       } },
@@ -66,7 +69,7 @@ export class ConversationController {
   private onBlur = (): void => { if (this.view.active) { this.view.inputReady = false; this.publish(); clearTimeout(this.blur); this.blur = setTimeout(() => this.end(), 20000); } };
   private onFocus = (): void => {
     clearTimeout(this.blur); this.blur = undefined;
-    if (this.view.active && !this.focusBlocked && !this.activatingFocus) this.focusInput();
+    if (this.view.active && !this.companion.state.productivity?.card && !this.focusBlocked && !this.activatingFocus) this.focusInput();
   };
   private focusInput(): void {
     if (!this.companion.window.isFocused()) return;
@@ -79,6 +82,7 @@ export class ConversationController {
   private touch(): void { clearTimeout(this.idle); this.idle = setTimeout(() => this.end(), 90000); }
   open(): void {
     if (this.disposed) return;
+    this.productivity?.open(null);
     // Stay in the hotkey/click callback's synchronous activation window.
     const window = this.companion.window;
     this.focusBlocked = false; this.view.focusFailed = false; clearTimeout(this.focusTimer);
@@ -119,6 +123,15 @@ export class ConversationController {
     }
   }
   copy(): void { clipboard.writeText(this.view.reply); }
+  async saveOutput(pinned: boolean) {
+    if (!this.view.reply || !this.productivity) return { ok: false, message: 'No reply to save.' };
+    const text = this.view.reply;
+    const existing = this.savedOutput?.text === text ? this.productivity.store.notes.value.find(n => n.id === this.savedOutput!.id && n.text === text) : undefined;
+    if (existing) return pinned && !existing.pinned ? this.productivity.action({ name: 'update_note', args: { id: existing.id, pinned: true } }) : { ok: true, message: 'Already saved.' };
+    const result = await this.productivity.action({ name: 'add_note', args: { text, topic: 'saved', pinned } });
+    if (result.ok && result.data) this.savedOutput = { text, id: (result.data as { id: string }).id };
+    return result;
+  }
   panel(expanded: boolean): void { if (this.view.active) { this.view.panel = expanded; this.publish(); } }
   private show(text: string, state: ConversationView['state'] = 'responding', record = true, forceBubble = false): void {
     if (!this.view.active) return;
@@ -142,6 +155,8 @@ export class ConversationController {
     if (!this.view.active || !this.view.inputReady) return;
     const text = cleanText(input); if (text.length > 4000) return;
     this.cancel(); clearTimeout(this.transition); this.touch(); const epoch = this.epoch;
+    // A new request replaces the previous temporary card; local intents may open a new one.
+    this.productivity?.open(null);
     this.view.reply = ''; this.view.panel = false; this.view.revision++; this.view.state = 'thinking'; this.publish();
     this.turns.push({ role: 'user', text, at: Date.now() }); this.turns = this.turns.slice(-200);
     try {
@@ -154,8 +169,6 @@ export class ConversationController {
         this.show(removed.length ? `Forgot that:\n${removed.map(m => `- ${flipPronouns(m.text)}`).join('\n')}` : 'Those memories are already gone.'); return;
       }
       this.choices = undefined;
-      // Numeric choices above are local commands, never model input.
-      if (needsClarification(text)) { this.show(line('talk_huh'), 'confused'); return; }
       if (this.confirmation && /^(?:yes|no)$/i.test(text)) {
         const call = this.confirmation; this.confirmation = undefined;
         if (/^no$/i.test(text)) { this.show('Cancelled. Nothing changed.'); return; }
@@ -165,6 +178,13 @@ export class ConversationController {
         return;
       }
       this.confirmation = undefined;
+      if (this.productivity) {
+        const productivity = await this.productivity.local(text);
+        if (epoch !== this.epoch || !this.view.active) return;
+        if (productivity) { this.confirmation = productivity.confirmation; this.show(productivity.message, productivity.ok ? 'responding' : 'unsure'); return; }
+      }
+      // Numeric productivity choices are handled before the model's input gate.
+      if (needsClarification(text)) { this.show(line('talk_huh'), 'confused'); return; }
       const intent = parseIntent(text);
       switch (intent.kind) {
         case 'remember': { const remembered = intent.text || this.turns.at(-2)?.text; if (!remembered) { this.show('What should I remember? Say remember that, then the thing.'); return; } const memory = this.store.add(remembered); this.lastSaved = memory.id; this.show(`Got it. I'll remember: ${flipPronouns(memory.text)}`); return; }

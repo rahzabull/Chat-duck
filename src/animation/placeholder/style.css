@@ -109,3 +109,12 @@
 @keyframes duck-laugh { 50% { transform: translateY(-5px) scaleY(.97); } }
 @keyframes conversation-interrupt { 40% { transform: rotate(-5deg); } }
 @keyframes conversation-finish { from { transform: rotate(5deg); } to { transform: rotate(0); } }
+.alarm-clock, .focus-laptop, .celebrate-confetti { display: none; }
+.duck[data-animation=alarm] .alarm-clock { display: inline; transform-origin: 217px 235px; animation: alarm-wiggle .18s ease-in-out 12; }
+.duck[data-animation=focus] .focus-laptop { display: inline; }
+.duck[data-animation=focus] .body-motion { transform: translateY(5px) scaleY(.98); transform-origin: 160px 290px; }
+.duck[data-animation=focus] .head, .duck[data-animation=focus] .wing-right, .duck[data-animation=focus] .wing-left { animation: none; }
+.duck[data-animation=celebrate] .celebrate-confetti { display: inline; animation: confetti-burst 1s ease-out 1 both; }
+@keyframes alarm-wiggle { 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+@keyframes confetti-burst { from { opacity: 1; transform: translateY(18px) scale(.85); } to { opacity: 0; transform: translateY(-18px) scale(1.12); } }
+.duck.reduced .alarm-clock, .duck.reduced .celebrate-confetti, .duck.paused .alarm-clock, .duck.paused .celebrate-confetti { animation: none; }

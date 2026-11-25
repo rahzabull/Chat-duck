@@ -22,6 +22,7 @@ export class ConversationUI {
     const button = (label: string, click: () => void) => { const b = document.createElement('button'); b.textContent = label; b.type = 'button'; b.onclick = click; this.controls.append(b); return b; };
     const expand = button('Expand', () => { this.panel.classList.toggle('expanded'); expand.textContent = this.panel.classList.contains('expanded') ? 'Collapse' : 'Expand'; });
     this.copy = button('Copy', () => { void window.ducky.talkCopy().then(() => { this.copy.textContent = 'Copied'; }).catch(() => { this.copy.textContent = 'Copy failed'; }); });
+    for (const pinned of [false, true]) { const save = button(pinned ? 'Pin' : 'Save', () => { save.disabled = true; void window.ducky.talkSave(pinned).then(r => { save.textContent = r.ok ? 'Saved' : 'Save failed'; }).catch(() => { save.textContent = 'Save failed'; }).finally(() => { save.disabled = false; }); }); }
     button('Close', () => { this.panel.hidden = true; window.ducky.talkPanel(false); this.input.focus(); this.stopSpeaking(); });
     this.panel.append(this.controls, this.content); document.body.append(this.panel, this.input);
     this.panel.hidden = true; this.input.hidden = true;

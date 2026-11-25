@@ -28,6 +28,11 @@ export class DuckyTray {
     const state = this.state();
     return Menu.buildFromTemplate([
       { label: 'Talk to Ducky', click: () => this.command('talk') },
+      { label: 'Tasks', click: () => this.command('tasks') },
+      { label: 'Add task…', click: () => this.command('add-task') },
+      { label: 'Add reminder…', click: () => this.command('add-reminder') },
+      { label: 'Start focus (25 min)', click: () => this.command('focus') },
+      { label: 'Notes', click: () => this.command('notes') },
       { label: 'Show Ducky', enabled: !state.visible, click: () => this.command('show') },
       { label: 'Hide Ducky', enabled: state.visible, click: () => this.command('hide') },
       { label: state.paused ? 'Resume' : 'Pause', click: () => this.command('pause') },

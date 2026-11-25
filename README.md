@@ -1,5 +1,56 @@
 # Ducky.exe
 
+## Productivity — Expansion Phase B
+
+Tasks, reminders, notes and focus work with **AI off**. Use temporary cards near
+Ducky; there is no dashboard or separate list window. The tray has Tasks, Add
+task…, Add reminder…, Start focus (25 min), and Notes. Tab reaches controls,
+Enter/Space activates buttons, and Escape closes the current card.
+
+Try:
+
+- `add urgent finish the presentation tomorrow to my list`
+- `what do I have today?` / `what's due this week?` / `overdue?`
+- `move the presentation task to Friday` / `mark presentation done`
+- `remind me to drink water in 1 minute`
+- `remind me to call Mum tomorrow at 6pm`
+- `every Tuesday take vitamins` (9am by default, displayed on the confirmation)
+- `pay rent on the first of every month` / `remind me to stretch every 3 days at 9am`
+- `snooze that 10 minutes` / `cancel the rent reminder` (confirmation required)
+- `note: campaign idea — ducks in space` / `what notes do I have about the campaign?`
+- `start a 25 minute focus timer` / `focus for an hour`
+- `pause the timer` / `resume the timer` / `how long is left?` / `stop the timer`
+
+Missing reminder times get “When?”; ambiguous titles get numbered choices.
+Unqualified `at 6` chooses the next 6 o'clock (6pm if 6am has passed); an explicit
+time earlier today moves to tomorrow. Use AM/PM to remove ambiguity. Task cards
+support title/date/priority/notes/category/subtask edits, completion, search and
+Today/Upcoming/Overdue/Done views. Delete, clear completed, and Undo require an
+explicit confirmation. Undo is offered for ten seconds after creation.
+
+**Reminders only fire while Ducky is running. There is no OS-level scheduling
+yet.** Keep Ducky in the tray. Start, resume and unlock check immediately; the
+running scheduler checks every 15 seconds, so a reminder may appear up to 15
+seconds after its time. Missed occurrences collapse into one card; recurring
+reminders advance to the next future date. Local wall times survive timezone
+changes, DST and shorter months. Windows notifications are optional and on by
+default. Reminders bypass mute and quiet talkativeness. Only one reminder card
+appears at a time, with a count of waiting reminders.
+
+Focus shows a small countdown with pause/resume/stop and quiets ambient behavior.
+At completion Ducky celebrates and offers a break (5 minutes, or 15 after four
+sessions); durations and automatic breaks are configurable. Active timers and the
+four-session counter last for this app run. Completed-session history is off by
+default. Reading-panel **Save** creates a note with topic `saved`; **Pin** saves
+and pins it. Find it again through Notes.
+
+Settings > Productivity controls notifications, snooze, focus and history, and
+provides confirmed delete-all and `.json`/`.txt` export through a save dialog.
+Tasks/reminders/notes are user data: **Forget everything does not delete them**.
+They live in schema-versioned local JSON files under Electron `userData`.
+Desktop verification (including notifications, mixed-DPI cards and CPU) is
+**pending Claude**; see [status](docs/status.md).
+
 ## Talk to Ducky — Expansion Phase A
 
 Double-click Ducky, press **Ctrl+Alt+D**, or choose **Talk to Ducky** in the tray or
@@ -50,7 +101,8 @@ A local desktop companion by Ente. **Milestone 2 prototype: “Give Ducky a brai
 A small animated SVG duck lives in a transparent Electron window, walks, follows
 your cursor with his eyes, reacts to clicks, and can be dragged and dropped.
 Optional local Ollama AI writes fresh lines alongside the hand-written voice.
-App awareness is separately opt-in. Sound and task management are not implemented.
+App awareness is separately opt-in. Sound is not implemented. Task management is
+provided by Phase B above.
 
 ## Optional local AI
 

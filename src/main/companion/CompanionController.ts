@@ -1,4 +1,6 @@
 import { conversationLayout } from '../../core/conversation/layout';
+import type { ProductivityView } from '../../core/productivity/types';
+import { PRODUCTIVITY_LINES } from '../../core/productivity/lines';
 import type { ConversationView } from '../../core/conversation/types';
 import { app, BrowserWindow, powerMonitor, screen, systemPreferences } from 'electron';
 import { MemoryStore } from '../memory/store';
@@ -21,6 +23,7 @@ import { HybridBrain, initialBrainState } from '../ai/HybridBrain';
 
 export class CompanionController {
   private conversationActive = false;
+  private productivityTimer?: ReturnType<typeof setTimeout>;
   private conversationQuietUntil = 0;
   private conversationQuietTimer?: ReturnType<typeof setTimeout>;
   private releasingConversationFocus = false;
@@ -153,8 +156,38 @@ export class CompanionController {
     });
   }
   setConversationInference(active: boolean): void { this.conversationInference = active; this.configureBrain(); }
-  private conversationQuiet(): boolean { return this.conversationActive || Date.now() < this.conversationQuietUntil; }
+  private conversationQuiet(): boolean { return this.surfaceOpen() || Date.now() < this.conversationQuietUntil; }
+  private surfaceOpen(): boolean { return this.conversationActive || !!this.state.productivity?.card || !!this.state.productivity?.focus || !!this.state.productivity?.breakMinutes; }
+  presentProductivity(view: ProductivityView): void {
+    const wasBusy = !!this.state.productivity?.focus || !!this.state.productivity?.card || !!this.state.productivity?.breakMinutes;
+    this.state.productivity = view;
+    if (view.focus || view.card || view.breakMinutes) {
+      this.endDrag(false); this.cancelClicks(); this.cancelActivity(); this.body.walking = false; this.body.vx = 0; this.body.vy = 0;
+      if (!wasBusy) { this.cancelReaction(); this.dismissBubble(); }
+      this.state.sleeping = false;
+      this.window.setFocusable(true);
+    }
+    if (!this.reactionTimer) this.setAnimation(this.baseAnimation());
+    this.presentConversation(this.state.conversation ?? { active: false, state: null, reply: '', panel: false, revision: 0, shortcutError: '' });
+    this.configureTimers();
+  }
+  productivityAttention(kind: 'alarm' | 'celebrate' | 'focus', text?: string): void {
+    this.cancelActivity(); this.cancelReaction(); this.body.walking = false; this.body.vx = 0; this.state.sleeping = false;
+    if (kind === 'alarm') {
+      const area = nearestArea(this.body, workAreas()); this.body.direction = this.body.x > area.x + area.width / 2 ? 'left' : 'right';
+      this.setVisible(true); this.window.showInactive();
+    }
+    if (text) {
+      const key = text === 'task_done' && this.store.value.profanity ? 'task_done_profane' : text;
+      const pool = PRODUCTIVITY_LINES[key as keyof typeof PRODUCTIVITY_LINES];
+      this.state.productivitySpeech = pool ? pool[Math.floor(Math.random() * pool.length)] : text;
+      clearTimeout(this.productivityTimer); this.productivityTimer = setTimeout(() => { this.state.productivitySpeech = undefined; this.publish(); }, 8000);
+    }
+    if (kind !== 'focus') this.react(kind, 'happy', kind === 'alarm' ? 3000 : 1200);
+    else this.setAnimation('focus');
+  }
   releaseConversationFocus(): void {
+    if (this.state.productivity?.card || this.state.productivity?.focus || this.state.productivity?.breakMinutes) return;
     // This hide only yields native focus; it must not invoke the user-hide path.
     this.releasingConversationFocus = true;
     try {
@@ -171,16 +204,19 @@ export class CompanionController {
   }
   presentConversation(view: ConversationView): void {
     if (this.window.isDestroyed()) return;
-    if (view.active || view.reply) {
+    if (view.active || view.reply || this.state.productivity?.card || this.state.productivity?.focus || this.state.productivity?.breakMinutes) {
       const base = { ...windowOrigin(this.body, this.size()), ...this.size() };
-      const result = conversationLayout(base, nearestArea(this.body, workAreas()), view.panel);
+      const result = conversationLayout(base, nearestArea(this.body, workAreas()), view.panel || !!this.state.productivity?.card);
       this.conversationBounds = result.bounds; view.layout = result.layout;
+      if (this.state.productivity) this.state.productivity.layout = result.layout;
     } else this.conversationBounds = undefined;
     this.state.conversation = view; this.moveWindow(); this.publish();
   }
   finishConversation(): void {
     if (!this.conversationActive) return;
-    this.conversationActive = false; this.conversationBounds = undefined; this.moveWindow();
+    this.conversationActive = false; this.conversationBounds = undefined;
+    if (this.state.productivity?.card || this.state.productivity?.focus || this.state.productivity?.breakMinutes) this.presentConversation(this.state.conversation!);
+    else this.moveWindow();
     this.conversationQuietUntil = Date.now() + 60000;
     clearTimeout(this.conversationQuietTimer);
     this.conversationQuietTimer = setTimeout(() => { this.conversationQuietTimer = undefined; this.configureTimers(); }, 60000);
@@ -247,7 +283,7 @@ export class CompanionController {
     if (changed) console.log('[ducky] Animation:', animation);
     this.publish();
   }
-  private baseAnimation(): string { return this.state.sleeping ? 'sleeping' : this.state.dragging ? 'picked_up' : !this.body.grounded ? 'falling' : this.body.walking ? 'walking' : this.activity ?? 'idle'; }
+  private baseAnimation(): string { return this.state.sleeping ? 'sleeping' : this.state.dragging ? 'picked_up' : this.state.productivity?.focus ? 'focus' : !this.body.grounded ? 'falling' : this.body.walking ? 'walking' : this.activity ?? 'idle'; }
   private react(animation: string, emotion: string, duration = 750): void {
     if (this.reactionTimer) clearTimeout(this.reactionTimer);
     this.state.emotion = emotion; this.setAnimation(animation, true);
@@ -319,7 +355,7 @@ export class CompanionController {
     this.publish();
   }
   hover(active: boolean): void {
-    if (this.conversationActive) return;
+    if (this.surfaceOpen()) return;
     this.brain.invalidate();
     this.hovered = active;
     if (this.hoverTimer) clearTimeout(this.hoverTimer); this.hoverTimer = undefined;
@@ -339,7 +375,7 @@ export class CompanionController {
     if (!this.window.isDestroyed()) this.window.setIgnoreMouseEvents(!(interactive || !!this.grab), { forward: true });
   }
   startDrag(local: Point): void {
-    if (this.conversationActive || !this.ready || this.state.paused || !this.state.visible || this.grab) return;
+    if (this.surfaceOpen() || !this.ready || this.state.paused || !this.state.visible || this.grab) return;
     this.brain.invalidate(); this.cancelActivity();
     const size = this.size();
     if (local.x < 0 || local.y < 0 || local.x > size.width || local.y > size.height) throw new Error('Invalid grab offset');
@@ -419,7 +455,7 @@ export class CompanionController {
     if (active && !this.emotionTimer) { this.emotions.suspend(); this.emotionTimer = setInterval(() => this.emotionTick(), 30000); }
     if (!active && this.emotionTimer) { clearInterval(this.emotionTimer); this.emotionTimer = undefined; }
     this.cursor.configure(active, !!this.grab);
-    const needMotion = active && !this.conversationActive && !this.grab && moving(this.body);
+    const needMotion = active && !this.surfaceOpen() && !this.grab && moving(this.body);
     if (needMotion && !this.motionTimer) {
       this.lastMotion = performance.now();
       this.motionTimer = setInterval(() => this.motionTick(), 1000 / 60);
@@ -546,11 +582,13 @@ export class CompanionController {
     this.endDrag(false); this.cancelActivity(); this.cancelReaction();
     this.fall = undefined;
     this.body = reset ? resetPosition(primaryArea(), this.size()) : recover(this.body, workAreas(), this.size());
+    if (this.state.productivity?.card || this.state.productivity?.focus || this.state.productivity?.breakMinutes) this.presentConversation(this.state.conversation!);
     this.moveWindow(); this.savePosition(); this.setAnimation(this.state.paused ? 'idle' : this.baseAnimation());
     this.configureTimers(); this.publish(); console.log('[ducky] Position recovered:', reason, this.windowOrigin());
   }
   resume(): void { this.events.emit('APP_RESUMED', undefined); this.recover('system resume'); this.checkIdle(); }
   dispose(): void {
+    clearTimeout(this.productivityTimer);
     clearTimeout(this.conversationQuietTimer);
     clearTimeout(this.muteTimer);
     this.memoryStore?.flush();

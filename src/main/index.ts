@@ -1,6 +1,9 @@
 import { ConversationController } from './conversation/controller';
 import { ConversationStore } from './conversation/store';
-import { app, globalShortcut, BrowserWindow, powerMonitor, screen } from 'electron';
+import { app, globalShortcut, BrowserWindow, powerMonitor, screen, Notification, dialog, clipboard } from 'electron';
+import { writeFile } from 'node:fs/promises';
+import { ProductivityService } from './productivity/service';
+import { ProductivityStore } from './productivity/store';
 import { join } from 'node:path';
 import { CHANNELS } from '../shared/constants';
 import type { Command, CompanionState } from '../shared/types';
@@ -14,6 +17,7 @@ import { createCompanion, createSettings, secureSession } from './windows';
 app.setName('Ducky');
 app.commandLine.appendSwitch('disable-background-networking');
 let conversation: ConversationController | undefined;
+let productivity: ProductivityService | undefined;
 let controller: CompanionController | undefined;
 let settingsWindow: BrowserWindow | undefined;
 let tray: DuckyTray | undefined;
@@ -37,6 +41,9 @@ function showSettings(): void {
 function command(command: Command): void {
   if (!controller) return;
   switch (command) {
+    case 'tasks': case 'notes': case 'add-task': case 'add-reminder':
+      controller.setVisible(true); productivity?.open(command); controller.window.setFocusable(true); controller.window.show(); controller.window.focus(); break;
+    case 'focus': void productivity?.action({ name: 'start_focus', args: { minutes: 25 } }); break;
     case 'talk': void conversation?.open(); break;
     case 'show': controller.setVisible(true); break;
     case 'hide': controller.setVisible(false); break;
@@ -54,11 +61,13 @@ function cleanup(): void {
   screen.removeListener('display-removed', displayChanged);
   screen.removeListener('display-metrics-changed', displayChanged);
   powerMonitor.removeListener('resume', resumed);
-  disposeIPC?.(); conversation?.dispose(); globalShortcut.unregisterAll(); controller?.dispose(); tray?.dispose();
+  powerMonitor.removeListener('unlock-screen', unlocked);
+  disposeIPC?.(); productivity?.dispose(); conversation?.dispose(); globalShortcut.unregisterAll(); controller?.dispose(); tray?.dispose();
   for (const window of BrowserWindow.getAllWindows()) window.destroy();
 }
 function displayChanged(): void { controller?.recover('display configuration changed'); }
-function resumed(): void { controller?.resume(); }
+function resumed(): void { controller?.resume(); void productivity?.tick(true); }
+function unlocked(): void { void productivity?.tick(true); }
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
@@ -72,7 +81,26 @@ else {
     secureSession();
     const store = new SettingsStore(join(app.getPath('userData'), 'settings.json'));
     controller = new CompanionController(createCompanion(), store, broadcast, new MemoryStore(join(app.getPath('userData'), 'memory.json'), store.value.memoryEnabled));
-    conversation = new ConversationController(controller, new ConversationStore(app.getPath('userData'), store.value.memoryEnabled, store.value.conversationRetention));
+    productivity = new ProductivityService(new ProductivityStore(app.getPath('userData')), {
+      changed: view => controller?.presentProductivity(view),
+      attention: (kind, text) => controller?.productivityAttention(kind, text),
+      doNotDisturb: () => false, // Future DND gate: durable delivery queues wait here.
+      copy: text => clipboard.writeText(text),
+      notify: (reminder, click) => {
+        if (!Notification.isSupported()) return;
+        const notification = new Notification({ title: 'Ducky reminder', body: reminder.text, silent: true });
+        notification.on('click', () => { controller?.setVisible(true); click(); controller?.window.setFocusable(true); controller?.window.show(); controller?.window.focus(); });
+        notification.show();
+      },
+      export: async (kind, data, format) => {
+        const result = await dialog.showSaveDialog({ title: `Export ${kind}`, defaultPath: `Ducky-${kind}.${format}`, filters: [{ name: format === 'json' ? 'JSON' : 'Text', extensions: [format] }] });
+        if (result.canceled || !result.filePath) return false;
+        const text = format === 'json' ? JSON.stringify({ version: 1, data }, null, 2) : data.map(row => Object.entries(row as Record<string, unknown>).map(([key, value]) => `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`).join('\n')).join('\n\n');
+        await writeFile(result.filePath, text, 'utf8'); return true;
+      },
+    });
+    conversation = new ConversationController(controller, new ConversationStore(app.getPath('userData'), store.value.memoryEnabled, store.value.conversationRetention), productivity);
+    controller.window.once('ready-to-show', () => productivity?.start());
     controller.onConversationClose = () => conversation?.end();
     tray = new DuckyTray(() => controller!.state, command);
     let menuKey = '';
@@ -80,9 +108,10 @@ else {
       const state = controller!.state; const key = `${state.visible}:${state.paused}:${state.settings.mute}`;
       if (key !== menuKey) { menuKey = key; tray?.refresh(); }
     };
-    disposeIPC = registerIPC(controller, () => settingsWindow, command, () => tray?.popup(), conversation);
+    disposeIPC = registerIPC(controller, () => settingsWindow, command, () => tray?.popup(), conversation, productivity);
     screen.on('display-added', displayChanged); screen.on('display-removed', displayChanged);
     screen.on('display-metrics-changed', displayChanged); powerMonitor.on('resume', resumed);
+    powerMonitor.on('unlock-screen', unlocked);
     console.log('[ducky] Started Milestone 1', app.getVersion());
   }).catch(error => { console.error('[ducky] Startup failed', error); app.quit(); });
 }

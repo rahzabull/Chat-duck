@@ -1,4 +1,68 @@
-# Ducky architecture (Milestones 1–3 and Expansion Phase A)
+# Ducky architecture (Milestones 1–3 and Expansion Phases A–B)
+
+## Expansion Phase B: productivity
+
+`core/productivity/parse.ts` uses the already installed chrono-node 2.10.3. It runs
+before Phase A memory intents and model inference, with numbered title choices
+and a pending “When?” continuation in `main/productivity/service.ts`. Ideas and
+notes route to notes rather than approved long-term memory. Relative dates, next
+ambiguous AM/PM occurrences and local calendar dates are deterministic under an
+injected parser reference date. Explicit recurring requests without a time use
+9am, which is shown on the confirmation card.
+
+`main/productivity/store.ts` owns tasks.json, reminders.json, notes.json and
+focus.json under userData. Each is `{version:1,data:...}` with validation, bounded
+lists and string lengths. Store snapshots are cloned. Mutations are serialized;
+the 250ms debounce resolves its promises only after temp-file write, fsync and
+atomic rename succeed. Only then do cards, acknowledgements and celebrations
+publish. Failed writes retain the last committed in-memory state. Corrupt files
+are copied to timestamped `.corrupt-*` backups before starting empty; a visible
+message reports recovery. Shutdown flushes pending writes. These stores are
+separate from all memory/retention/Forget everything paths.
+
+`core/scheduler` is Electron-free and takes wall and monotonic clocks. Main checks
+every 15 seconds, at startup and on powerMonitor resume/unlock-screen. It compares
+elapsed clocks for jumps over two minutes and checks the system timezone on each
+tick. Dates advance with local calendar setters, retaining an original wall-time
+anchor across DST gaps. Monthly 31 clamps to the last day; custom intervals keep
+their original calendar-day phase. Timezone changes translate old-zone wall time
+to the new system-local zone. A passed recurring schedule produces one delivery
+and advances directly to a future occurrence, not one delivery per missed day.
+
+Before presentation, the scheduler durably commits `state:due`, `lastFiredAt`
+(the delivered occurrence's timestamp, also the idempotence marker), clears a
+fired snooze, and advances recurring `at`. A crash after this write but before
+presentation leaves an outstanding due card recoverable on startup; it does not
+repeat the alarm/OS notification. Done/Dismiss acknowledge the occurrence;
+recurring reminders remain scheduled. Cancel deletes the reminder after
+confirmation. A single queue and one card expose a waiting count. New deliveries
+bypass ordinary speech mute/talkativeness; the injectable doNotDisturb hook holds
+presentation for a future DND feature. Notification clicks open the relevant card.
+There is **no OS-level scheduling**: reminders only fire while Ducky is running.
+
+The Phase A registry exposes task/reminder/note/focus tools; its live names now
+also populate the constrained model JSON schema. Destructive tools have `confirm`
+permission. Conversation uses authored yes/no prompts; cards/settings receive
+single-use, action-bound, 60-second main-process confirmation tokens. A renderer
+cannot supply a `confirmed` boolean. Failed tools bypass model prose and successful
+mutations use authoritative tool acknowledgements. The existing trusted-frame IPC
+checks protect the explicit productivity and reading-save preload methods.
+
+`renderer/companion/productivity.ts` uses only DOM text/value nodes for data. It
+shares the Phase A upward/sideways clamped layout and foot anchor, with a card
+maximum of 420 DIP in each dimension (current layout requests 360 high). Native
+buttons and fields support Tab/Enter/Space; capture-phase Escape closes a card
+before ending conversation. Cards hold movement still and suppress ambient
+interruptions; they do not create a second window. A reminder turns Ducky toward
+the centre side without walking. Save/Pin store a reading reply as one saved note.
+
+Focus uses one deadline timeout only while running and a one-second countdown
+only in the active renderer badge. Pause clears both. Sessions and the four-focus
+break counter are in RAM; focus.json keeps defaults and opt-in completed-session
+history (bounded to 1000). History defaults off and disabling it erases entries.
+Focus suppresses ambient activity/speech/app comments, while reminders continue.
+Breaks can be offered or auto-started. Alarm/celebrate are finite placeholder
+clips; focus is a static laptop pose. Native CPU and desktop behavior await Claude.
 
 ## Expansion Phase A: conversation flow
 
@@ -278,14 +342,14 @@ Inline styles are allowed for SVG/CSS adapter properties and React styles.
 | M2: brain | Implemented above; real-model quality and desktop responsiveness pending Claude |
 | M3: personality | Implemented below; desktop voice, animation and CPU verification pending Claude |
 | M4: awareness | Add separately permission-gated collectors under `src/awareness`; emit typed events without changing physics/renderers |
-| M5: productivity | Add `src/main/database` SQLite repository and `src/main/scheduler` durable reminder service; task/reminder/focus events feed existing interruption rules |
+| M5: productivity | Implemented as Expansion Phase B above, using validated local JSON rather than SQLite |
 | M6: vision | Add separately authorized selected-window capture under `src/awareness/vision`, transient data and validated AI context; no current capture permission or pipeline |
 | M7: art | Replace `PlaceholderDuck` with the Rive implementation of the same adapter/surface contract |
 | M8: release | Installer/signing, resource budgets, long-duration testing, crash recovery and security/accessibility review |
 
-Future productivity timers must have their own lifetime: hiding the companion
-must not implicitly stop reminders. There is no task database or reminder
-scheduler. Opt-in awareness and local AI are implemented.
+Productivity timers have their own lifetime: hiding the companion does not stop
+reminders. Phase B supplies the task stores and reminder scheduler described above.
+Opt-in awareness and local AI are implemented.
 
 ## Milestone 3 personality and memory flow
 

@@ -1,4 +1,6 @@
 import type { ConversationController } from '../conversation/controller';
+import type { ProductivityService } from '../productivity/service';
+import type { ProductivityAction } from '../../core/productivity/types';
 import type { LibraryAction } from '../../core/conversation/types';
 import { ipcMain, type IpcMainEvent, type IpcMainInvokeEvent, type BrowserWindow } from 'electron';
 import { CHANNELS } from '../../shared/constants';
@@ -8,7 +10,7 @@ import type { CompanionController } from '../companion/CompanionController';
 import { isTrustedFrame } from '../windows';
 
 export function registerIPC(controller: CompanionController, getSettings: () => BrowserWindow | undefined,
-  command: (command: Command) => void, contextMenu: () => void, conversation?: ConversationController): () => void {
+  command: (command: Command) => void, contextMenu: () => void, conversation?: ConversationController, productivity?: ProductivityService): () => void {
   const disposers: Array<() => void> = [];
   function authorized(event: IpcMainEvent | IpcMainInvokeEvent, channel: string, payload: unknown, companionOnly: boolean): boolean {
     const sender = event.sender;
@@ -32,6 +34,8 @@ export function registerIPC(controller: CompanionController, getSettings: () => 
     };
     ipcMain.on(channel, listener); disposers.push(() => ipcMain.removeListener(channel, listener));
   }
+  handle(CHANNELS.productivity, payload => productivity?.action(payload as ProductivityAction));
+  handle(CHANNELS.talkSave, payload => conversation?.saveOutput(payload as boolean), true);
   handle(CHANNELS.talkCopy, () => conversation?.copy(), true);
   handle(CHANNELS.talkSend, payload => conversation?.send(payload as string), true);
   handle(CHANNELS.talkEnd, () => conversation?.end(), true);

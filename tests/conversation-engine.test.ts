@@ -4,7 +4,7 @@ import { ToolRegistry, type Tool } from '../src/main/tools';
 import { DEFAULT_SETTINGS } from '../src/shared/schemas/settings';
 import type { AIProvider } from '../src/ai/providers';
 import { OllamaProvider } from '../src/ai/ollama';
-import { CONVERSATION_SCHEMA } from '../src/core/conversation/validation';
+import { CONVERSATION_SCHEMA, conversationSchema } from '../src/core/conversation/validation';
 import { TALK_LINES } from '../src/core/dialogue/lines';
 const context: EngineContext = { settings: { ...DEFAULT_SETTINGS, aiEnabled: true, aiModel: 'qwen3:8b' }, turns: [{ role: 'user', text: 'Explain recursion', at: Date.now() }], memories: [], summaries: [], now: Date.now() };
 const response = (reply = 'A function calling itself.', tool: object | null = null) => JSON.stringify({ reply, tone: 'explaining', tool });
@@ -47,6 +47,17 @@ describe('tool permissions and honest results', () => {
   });
 });
 describe('conversation engine with fake provider', () => {
+  it('exposes productivity tools in the constrained schema and returns the real mutation result', async () => {
+    const p = provider(); const t: Tool = { name: 'add_task', description: 'add_task(title:string)', permission: 'safe', validate: a => typeof a.title === 'string', execute: () => ({ ok: true, message: 'Added: insurance' }) };
+    vi.mocked(p.generate).mockResolvedValueOnce(response('Let me save that.', { name: 'add_task', args: { title: 'insurance' } })).mockResolvedValueOnce(response('I booked you a flight too.'));
+    const result = await new ConversationEngine(p, new ToolRegistry([t])).reply(context);
+    expect(result.reply).toBe('Added: insurance');
+    expect(vi.mocked(p.generate).mock.calls[0][0].format).toEqual(conversationSchema(['add_task']));
+  });
+  it.each(['I added that task.', 'I updated the note.', 'Reminder created.', 'Timer started.'])('blocks unverified productivity acknowledgement: %s', async text => {
+    const p = provider(); vi.mocked(p.generate).mockResolvedValue(response(text));
+    expect((await new ConversationEngine(p, new ToolRegistry([])).reply(context)).reply).not.toBe(text);
+  });
   it.each([false, true])('regenerates unsafe output once with profanity=%s', async profanity => {
     const p = provider(); vi.mocked(p.generate).mockResolvedValueOnce(response('Retard?')).mockResolvedValueOnce(response('Say that again?'));
     const result = await new ConversationEngine(p, new ToolRegistry([])).reply({ ...context, settings: { ...context.settings, profanity } });
@@ -85,7 +96,7 @@ describe('conversation engine with fake provider', () => {
     expect(result.reply).toContain('function');
     const request = vi.mocked(p.generate).mock.calls[0][0];
     expect(request.messages).toHaveLength(13); expect(request.messages[1].content).toBe('18');
-    expect(request.conversation).toBe(true); expect(request.format).toBe(CONVERSATION_SCHEMA);
+    expect(request.conversation).toBe(true); expect(request.format).toEqual(conversationSchema([]));
     const prompt = conversationPrompt(context, new ToolRegistry([]));
     expect(prompt).toContain('cannot browse'); expect(prompt).toContain('correct and useful first'); expect(prompt).toContain('Do not swear');
   });

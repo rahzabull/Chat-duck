@@ -1,5 +1,34 @@
 # Ducky implementation status
 
+## Expansion Phase B — productivity (2026-11-25)
+
+| Area | Implementation / automated verification | Desktop verification |
+| --- | --- | --- |
+| Local language | chrono-node dates, tasks/reminders/notes/focus before AI, missing dates and numbered title choices; phrasing/ambiguity tests | Pending Claude, AI off and on |
+| Stores | Version 1 JSON, validation, cloned snapshots, serialized debounced durable writes, fsync/rename, corrupt backups, failed-write tests | Pending Claude, inspect userData |
+| Reminders | 15s scheduler, startup/resume/unlock, clock jump/timezone detection, missed collapse, marker-before-notify, queue, snooze and recurrence | Pending Claude, one-minute/sleep/restart/Windows notification |
+| Calendar math | Daily/selected weekdays/monthly 31/custom intervals, spring/fall DST and timezone tests | Pending Claude |
+| Task cards | Today/Upcoming/Overdue/Done/search, edits/priority/subtasks, Add/Undo/confirmed Delete and Clear completed | Pending Claude, keyboard and celebration |
+| Reminder cards | Confirmation/Edit/Undo, list, due card with Done/Snooze/custom/Reschedule/Dismiss and waiting count | Pending Claude |
+| Notes | Editable plain text, search/Copy/Pin/Delete; reading Save/Pin writes one note with topic saved | Pending Claude, save and retrieve an answer |
+| Focus | Countdown, pause/resume/stop, quiet static pose, celebration, optional breaks and opt-in history | Pending Claude, short timer and four-session break |
+| Tools / IPC | Live tool names in model schema, confirm permission for destructive operations, bound single-use UI tokens, truthful mutation results | Pending Claude, local model requests |
+| Settings / tray | Productivity preferences, running-only notice, separate delete-all and JSON/text save-dialog export; memory independent | Pending Claude |
+| Safe rendering / layout | DOM text/value rendering tests, native controls and Escape handling, shared fixed-feet/clamped layout | Pending Claude, mixed DPI / edges |
+| Performance | Reminder interval only every 15s; active focus deadline and active-only countdown; no new idle animation loop | Pending Claude, idle CPU including helper |
+
+Automated checks: typecheck passed; 744 tests passed and two existing native/manual
+tests skipped; production build passed for main, preload and both renderers.
+`git diff --check` passed. The existing Vite CommonJS/config-loader warning is non-fatal.
+No commit, dependency installation, network access, Notion or MCP use.
+
+Reminders only fire while Ducky is running; there is no OS-level scheduling.
+Active focus sessions/cycle count are in RAM and end on restart. A crash between
+persisting a fired marker and notifying leaves a due card for the next launch
+without a repeated alarm. Windows notification policy and actual activation,
+rendering, mixed-display layout, timer sleep behavior and CPU are **not** proven
+by mocks: desktop verification is pending Claude.
+
 ## Expansion Phase A — talk to Ducky (2026-11-25)
 
 | Area | Implementation / automated verification | Desktop verification |

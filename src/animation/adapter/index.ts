@@ -1,6 +1,7 @@
 export const CONVERSATION_STATES = ['listening', 'thinking', 'responding', 'confused', 'explaining', 'amused', 'sarcastic', 'unsure', 'interrupted', 'conversation_end'] as const;
 export type ConversationState = typeof CONVERSATION_STATES[number];
 export const ANIMATION_IDS = [
+  'alarm', 'focus', 'celebrate',
   'look_around', 'yawn', 'stretch', 'dance', 'side_eye', 'nap', 'strike', 'sunglasses', 'bread_snack', 'visitor',
   'idle', 'blink', 'look_left', 'look_right', 'walking', 'startled', 'picked_up',
   'falling', 'landing', 'sleeping', 'waking_up', 'angry', 'happy', 'talking', 'sitting',
