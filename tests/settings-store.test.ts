@@ -32,3 +32,9 @@ describe('local settings persistence (no Electron)', () => {
     const loaded = new SettingsStore(path); expect(loaded.value.position).toEqual({ x: 2300, y: 1400 }); expect(loaded.value.firstLaunchDone).toBe(true);
   });
 });
+describe('hand-edited settings files', () => {
+  it('accepts a UTF-8 byte order mark (as written by Windows PowerShell)', () => {
+    const path = fixture(); writeFileSync(path, '﻿' + JSON.stringify({ walking: false, appAwareness: true }));
+    const store = new SettingsStore(path); expect(store.value.walking).toBe(false); expect(store.value.appAwareness).toBe(true);
+  });
+});

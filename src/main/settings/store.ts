@@ -8,7 +8,7 @@ export class SettingsStore {
   private timer?: ReturnType<typeof setTimeout>;
   constructor(private path: string) {
     let loaded: unknown;
-    try { if (existsSync(path)) loaded = JSON.parse(readFileSync(path, 'utf8')); }
+    try { if (existsSync(path)) loaded = JSON.parse(readFileSync(path, 'utf8').replace(/^﻿/, '')); }
     catch { console.warn('[ducky] Invalid settings file; using defaults'); }
     this.value = parseSettings(loaded);
   }
