@@ -59,9 +59,16 @@ messages per session and 500 sessions; explicit memories cap at 1,000.
 Conversations contain typed input and Ducky's replies. They never receive awareness
 context, app-history samples, private-app flags, window titles, screen data or
 screenshots. Observed app names never enter these files; user-supplied conversation
-text may include app names. Conversation focus does not capture a native window
-handle or application identity. Closing hides and immediately shows the duck
-inactive, letting Windows activate the next window in z-order.
+text may include app names. Just before a conversation takes focus, main asks the
+resident helper for the foreground HWND (an opaque native window handle). This
+command performs no title or process lookup. The handle is held only in RAM,
+never logged, persisted, sent to renderers or included in AI context. If the
+helper is unavailable or does not reply within 150 ms, main uses its last sampled
+HWND. Closing sends that handle back to the helper, which checks `IsWindow` and
+calls `SetForegroundWindow`, then Ducky becomes non-focusable. If no handle is
+known, closing uses hide/showInactive to let Windows select the next window.
+The conversation handle is cleared after the close attempt; the last sampled
+handle remains in RAM until replaced by a sample or cleared on quit.
 
 With AI enabled, local Ollama receives the last 12 messages, up to eight selected
 memories, up to three summaries/topics, preferred name, local time, preset and tool
@@ -109,7 +116,8 @@ or download was performed for this change.
 - Display work areas, system reduced-motion preference, current local time,
   Ducky's own settings, and interactions with Ducky.
 - An anonymous foreground-window/monitor rectangle comparison every three
-  seconds while visible, awake and unpaused, solely to suppress fullscreen activity.
+  seconds while visible, awake and unpaused, to suppress fullscreen activity,
+  plus its opaque window handle for conversation focus restoration.
 
 No keyboard input, clipboard, microphone, camera, browser history, screenshots,
 web page content, window titles, or personal documents are read.
@@ -134,22 +142,25 @@ The helper compiles a small C# wrapper with `Add-Type`. Every three seconds it:
    `QueryFullProcessImageName`. The path is transient and reduced immediately to
    its executable basename. It does not open/read that executable's contents.
 3. Compares the window rectangle with its monitor rectangle to detect fullscreen.
-4. Writes exactly one `exeName|0` or `exeName|1` record to stdout. Inaccessible,
+4. Writes exactly one `exeName|0|hwnd` or `exeName|1|hwnd` record to stdout. Inaccessible,
    excluded, and self-owned windows use anonymous `unknown`, `private`, or `self`
    sentinels instead of an app name.
 
 There are no title-reading or screen-capture APIs. Ducky cannot tell which web
 page, document, chat, design, or tab is open. With awareness off, the same helper
 runs a geometry-only script: no foreground process ID, executable name or path
-is queried. It emits only anonymous `unknown|0` or `unknown|1`. This suppresses
+is queried. It emits only anonymous `unknown|0|hwnd` or `unknown|1|hwnd`. This suppresses
 autonomous activities in fullscreen without collecting identity. The helper
 stops while hidden, paused, asleep or quitting. Detection uses three-second
 samples; Hide/Pause provides immediate suppression.
 
 Main supplies its own process IDs (including Electron child processes) through
-stdin. Owned `electron.exe` / `Ducky.exe` windows are ignored. A managed background
-thread waits on this pipe without polling; foreground sampling remains every
-three seconds. A parent-process handle and closed-input check make the helper
+stdin. The only other accepted commands are exactly `fg` (immediately replies
+`hwnd|number`) and `restore number`. Handles and PID lists accept ASCII digits
+only, with numeric range checks. Owned `electron.exe` / `Ducky.exe` identities are
+ignored. A managed background thread waits on this pipe without polling and
+handles focus commands immediately; foreground sampling remains every three
+seconds. A parent-process handle and closed-input check make the helper
 exit if its owner disappears. Main kills its owned helper and clears session
 context on pause, hide, sleep, and quit. Disabling awareness replaces the identity
 helper with its anonymous geometry-only mode. Rapid mode changes wait for the

@@ -40,7 +40,9 @@ describe('conversation input focus presentation', () => {
     state.conversation!.inputReady = false; ui.render(state);
     frames.splice(0).forEach(frame => frame(0)); // A queued frame cannot focus a now-hidden input.
     expect(ui.input.focus).toHaveBeenCalledTimes(2); expect(ui.input.hidden).toBe(true); expect(bubble.textContent).not.toBe('Click me to type.');
-    const keydown = vi.mocked(document.addEventListener).mock.calls.find(([name]) => name === 'keydown')![1] as (event: unknown) => void;
+    const registration = vi.mocked(document.addEventListener).mock.calls.find(([name]) => name === 'keydown')!;
+    expect(registration[2]).toBe(true); // Capture runs before a focused textarea/card can stop bubbling.
+    const keydown = registration[1] as (event: unknown) => void;
     keydown({ key: 'Escape', preventDefault: vi.fn() }); expect(end).toHaveBeenCalledOnce();
     state.conversation!.focusFailed = true; ui.render(state); expect(bubble.textContent).toBe('Click me to type.');
     state.conversation!.active = false; state.conversation!.reply = ''; state.conversation!.state = null; ui.render(state);

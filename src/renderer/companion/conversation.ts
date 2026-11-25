@@ -13,6 +13,7 @@ export class ConversationUI {
   private active = false; private speaking = false; private wasActive = false;
   private inputReady = false; private focusRequest = -1;
   private focusFailed = false;
+  private cardOpen = false;
   private copy: HTMLButtonElement;
   constructor(private host: HTMLElement, private bubble: HTMLButtonElement, private adapter: CharacterSurface) {
     this.input.id = 'talk-input'; this.input.rows = 1; this.input.maxLength = 4000;
@@ -38,7 +39,10 @@ export class ConversationUI {
         void window.ducky.talkSend(text).catch(() => { if (this.active) { this.bubble.textContent = 'Couldn’t send that. Try again?'; this.bubble.hidden = false; } });
       }
     });
-    document.addEventListener('keydown', event => { if (event.key === 'Escape' && this.active) { event.preventDefault(); void window.ducky.talkEnd(); } });
+    document.addEventListener('keydown', event => {
+      // The card's capture listener owns the first Escape, regardless of listener order.
+      if (event.key === 'Escape' && this.active && !this.cardOpen) { event.preventDefault(); void window.ducky.talkEnd(); }
+    }, true);
   }
   hit(element: Element | null): boolean { return !!element && ((!this.input.hidden && this.input.contains(element)) || (!this.panel.hidden && this.panel.contains(element))); }
   clickToType(): boolean {
@@ -60,6 +64,7 @@ export class ConversationUI {
     return true;
   }
   render(state: CompanionState): boolean {
+    this.cardOpen = !!state.productivity?.card;
     const view = state.conversation; this.active = view?.active ?? false;
     const owns = this.active || !!view?.reply || view?.state === 'conversation_end';
     this.adapter.setConversationState(view?.state ?? null);

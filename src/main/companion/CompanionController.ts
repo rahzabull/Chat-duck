@@ -27,6 +27,7 @@ export class CompanionController {
   private conversationQuietUntil = 0;
   private conversationQuietTimer?: ReturnType<typeof setTimeout>;
   private releasingConversationFocus = false;
+  private conversationHwnd?: string;
   private conversationInference = false;
   private conversationBounds?: { x: number; y: number; width: number; height: number };
   private muteUntil = 0;
@@ -186,12 +187,19 @@ export class CompanionController {
     if (kind !== 'focus') this.react(kind, 'happy', kind === 'alarm' ? 3000 : 1200);
     else this.setAnimation('focus');
   }
+  captureConversationFocus(ready: () => void): void {
+    this.awareness.captureForeground(hwnd => { this.conversationHwnd = hwnd; ready(); });
+  }
   releaseConversationFocus(): void {
-    if (this.state.productivity?.card || this.state.productivity?.focus || this.state.productivity?.breakMinutes) return;
+    if (this.state.productivity?.card) return;
     // This hide only yields native focus; it must not invoke the user-hide path.
     this.releasingConversationFocus = true;
     try {
-      this.window.setFocusable(false); this.window.hide(); this.window.showInactive();
+      const known = this.conversationHwnd !== undefined;
+      if (this.conversationHwnd !== undefined) this.awareness.restoreForeground(this.conversationHwnd);
+      this.conversationHwnd = undefined;
+      this.window.setFocusable(false);
+      if (!known) { this.window.hide(); this.window.showInactive(); }
       this.window.setAlwaysOnTop(this.store.value.alwaysOnTop && !this.store.value.desktopOnly, 'screen-saver');
     } finally { this.releasingConversationFocus = false; }
   }

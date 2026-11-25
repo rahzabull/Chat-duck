@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { reminderLabel } from '../../core/productivity/presentation';
 import { parseDate, parseProductivity } from '../../core/productivity/parse';
 import { localTime, type Card, type FocusSession, type ProductivityAction, type ProductivityResult, type ProductivityView, type Reminder, type Task } from '../../core/productivity/types';
 import { day, iso, time, validFocus, validNote, validReminder, validTask } from '../../core/productivity/validation';
@@ -46,7 +47,7 @@ export class ProductivityService {
       tool('clear_completed', 'clear_completed() removes completed tasks; confirm', () => true, async () => { await store.tasks.save(store.tasks.value.filter(t => !t.done)); return this.result('Completed tasks cleared.'); }, true),
       tool('add_reminder', 'add_reminder(text:string, at:ISO datetime, recurrence?:{kind:daily|weekly|monthly|custom,weekdays?:number[],dayOfMonth?:number,intervalDays?:number})', a => validReminder(this.newReminder(a)), async a => {
         const reminder = this.newReminder(a); if (Date.parse(reminder.at) <= Date.now()) return { ok: false, message: 'Choose a future reminder time.' };
-        await store.reminders.save([...store.reminders.value, reminder]); this.created('reminder', reminder.id); return this.result(`Reminder saved: ${reminder.text} — ${new Date(reminder.at).toLocaleString()}`, reminder);
+        await store.reminders.save([...store.reminders.value, reminder]); this.created('reminder', reminder.id); return this.result(`Reminder saved: ${reminder.text} — ${reminderLabel(reminder)}`, reminder);
       }),
       tool('list_reminders', 'list_reminders()', () => true, () => { this.open('reminders'); return this.result('Here are your reminders.', store.reminders.value); }),
       tool('snooze_reminder', 'snooze_reminder(id?:string, query?:text, minutes:number)', a => target(a) && minutes(a.minutes), a => this.changeReminder(a, 'snooze')),

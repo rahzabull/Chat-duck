@@ -30,6 +30,7 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
 #productivity-card input:not([type=checkbox]), #productivity-card textarea { width: 100%; min-width: 0; border: 1px solid #b6c4ae; border-radius: 6px; padding: 6px; margin: 4px 0; background: white; color: inherit; font: inherit; user-select: text; }
 #productivity-card textarea { min-height: 90px; resize: vertical; }
 #productivity-card article { border-top: 1px solid #d9e1d0; padding: 8px 0; }
+#productivity-card h3 { font-size: 12px; margin: 10px 0 4px; color: #52654b; }
 #productivity-card button, #productivity-card select, #focus-badge button { border: 1px solid #bbcbb1; border-radius: 6px; padding: 4px 7px; margin: 3px 2px; background: #eef4e7; color: inherit; cursor: pointer; font: inherit; }
 #productivity-card button[aria-pressed=true] { background: #d4e8c6; }
 #productivity-card :focus-visible, #focus-badge :focus-visible { outline: 2px solid #23734a; outline-offset: 1px; }

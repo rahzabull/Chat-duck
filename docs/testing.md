@@ -1,5 +1,31 @@
 # Testing
 
+## Phase B desktop fixes, round 2
+
+Regression tests cover the resident helper's `fg`/`restore` protocol, strict handle
+validation, sampled-handle and no-handle fallbacks, capture-before-focus ordering,
+and restoring before making Ducky non-focusable. HWNDs stay out of public samples.
+Renderer tests cover capture-phase Escape in either listener order, Today tasks
+(dated, overdue and undated), search, and shared reminder labels without seconds.
+
+The opt-in keyboard check builds an isolated fixture using the production UI
+classes and existing Vite dependency, then sends Chromium `Input.dispatchKeyEvent`
+Escape twice. A focused card textarea and the conversation textarea both stop
+propagation at the target. The assertions require card close followed by
+conversation end. It uses a temporary profile and does not launch the main app:
+
+```powershell
+$env:DUCKY_NATIVE_UI_TEST = '1'
+try { npm test -- tests/conversation-keyboard-native.test.ts }
+finally { Remove-Item Env:\DUCKY_NATIVE_UI_TEST }
+```
+
+In this agent environment Electron fails before loading the fixture because its
+install directory lacks the AppContainer read ACL it requires. The native helper
+checks passed, including an immediate `fg` reply; the CDP keyboard test and actual
+Claude-to-Ducky-to-Claude focus restoration still need a desktop run. No production
+sandbox setting or system ACL was changed.
+
 ## Milestone 2 local AI
 
 `npm test` uses fake providers/fetch and fake timers for local AI. It covers

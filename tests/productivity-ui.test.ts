@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProductivityUI, reminderLabel } from '../src/renderer/companion/productivity';
 import { FOCUS_DEFAULTS, type ProductivityView } from '../src/core/productivity/types';
 import type { CompanionState } from '../src/shared/types';
+import { ConversationUI } from '../src/renderer/companion/conversation';
+import type { CharacterSurface } from '../src/animation/adapter';
 // Deliberately no HTML parser: assigning to an unsafe sink fails the test immediately.
 class Node {
   tag: string; children: Node[] = []; attrs = new Map<string, string>(); textContent = ''; value = ''; hidden = false; disabled = false; type = ''; checked = false;
-  style = {}; classList = { toggle: vi.fn() }; onclick?: () => void; oninput?: () => void;
+  style = { setProperty: vi.fn() }; classList = { toggle: vi.fn(), remove: vi.fn(), contains: vi.fn() }; onclick?: () => void; oninput?: () => void;
+  addEventListener = vi.fn(); removeAttribute = vi.fn();
   constructor(tag = 'div') { this.tag = tag; }
   set innerHTML(_value: string) { throw new Error('HTML sink is forbidden'); }
   append(...nodes: Node[]) { this.children.push(...nodes); }
@@ -30,6 +33,58 @@ function setup(card: ProductivityView['card']) {
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe('temporary productivity cards', () => {
+  it('shows today and overdue open tasks, then undated tasks under No date, respecting search', () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 10, 25, 12));
+    const { ui, view, state } = setup('tasks'); const base = view.tasks[0];
+    view.tasks = [
+      { ...base, id: 'u', title: 'buy dog food', due: undefined },
+      { ...base, id: 't', title: 'today', due: '2026-11-25' },
+      { ...base, id: 'o', title: 'late', due: '2026-11-24' },
+      { ...base, id: 'f', title: 'future', due: '2026-11-26' },
+      { ...base, id: 'd', title: 'done', done: true, due: undefined },
+    ]; view.revision++; ui.render(state);
+    const card = ui.card as unknown as Node;
+    const titles = () => card.querySelectorAll('input').filter(n => n.attrs.get('aria-label')?.startsWith('Title:')).map(n => n.value);
+    expect(titles()).toEqual(['today', 'late', 'buy dog food']);
+    expect(card.querySelectorAll('small').map(n => n.textContent)).toContain('Overdue');
+    expect(card.querySelectorAll('h3').map(n => n.textContent)).toContain('No date');
+    const heading = card.children.findIndex(n => n.textContent === 'No date');
+    expect(card.children[heading + 1].querySelectorAll('input').some(n => n.value === 'buy dog food')).toBe(true);
+    const search = card.querySelectorAll('input').find(n => n.attrs.get('aria-label') === 'Search tasks')!;
+    search.value = 'dog'; search.oninput!(); expect(titles()).toEqual(['buy dog food']); ui.dispose();
+  });
+  it('formats reminder dates in plain words, with no seconds and stable AM/PM', () => {
+    const { ui, view } = setup('reminders'); const now = new Date(2025, 10, 25, 12);
+    const r = { ...view.reminders[0], state: 'scheduled' as const };
+    expect(reminderLabel({ ...r, at: new Date(2025, 10, 25, 16, 17, 59).toISOString() }, now)).toBe('Today, 4:17 PM');
+    expect(reminderLabel({ ...r, at: new Date(2025, 10, 26, 9).toISOString() }, now)).toBe('Tomorrow, 9:00 AM');
+    expect(reminderLabel({ ...r, at: new Date(2025, 11, 2, 18).toISOString() }, now)).toBe('Tue 2 Dec, 6:00 PM');
+    expect(reminderLabel({ ...r, at: new Date(2025, 11, 2, 9).toISOString(), recurrence: { kind: 'weekly', weekdays: [2] } }, now)).toBe('Every Tuesday, 9:00 AM');
+    ui.dispose();
+  });
+  it('handles first Escape for the card and second for the conversation before target bubbling, in either listener order', async () => {
+    vi.stubGlobal('requestAnimationFrame', vi.fn());
+    const { ui, view, state, listeners, api } = setup('notes');
+    const end = vi.fn(); Object.assign(window.ducky, { talkEnd: end });
+    const conversation = new ConversationUI(new Node() as unknown as HTMLElement, new Node() as unknown as HTMLButtonElement,
+      { setConversationState: vi.fn(), setTalking: vi.fn() } as unknown as CharacterSurface);
+    state.conversation = { active: true, inputReady: false, state: 'listening', reply: '', revision: 1, panel: false, shortcutError: '' };
+    const keyboard = listeners.filter(l => l.name === 'keydown'); expect(keyboard.every(l => l.capture === true)).toBe(true);
+    for (const ordered of [keyboard, [...keyboard].reverse()]) {
+      view.card = 'notes'; view.revision++; ui.render(state); conversation.render(state); end.mockClear(); api.mockClear();
+      const dispatch = () => {
+        let stopped = false;
+        const event = { key: 'Escape', preventDefault: vi.fn(), stopImmediatePropagation: () => { stopped = true; } };
+        for (const listener of ordered) { listener.fn(event); if (stopped) break; }
+        // A textarea stopping propagation at the target cannot prevent these capture listeners.
+        stopped = true;
+      };
+      dispatch(); await Promise.resolve(); expect(api).toHaveBeenCalledWith({ name: 'close', args: {} }); expect(end).not.toHaveBeenCalled();
+      view.card = null; view.revision++; ui.render(state); conversation.render(state);
+      dispatch(); expect(end).toHaveBeenCalledOnce();
+    }
+    conversation.dispose(); ui.dispose();
+  });
   it.each(['tasks', 'task-created', 'reminders', 'reminder-created', 'reminder-due', 'notes', 'add-task', 'add-reminder'] as const)('renders %s entirely through safe DOM text/value nodes', card => {
     const { ui } = setup(card); expect(ui.card.hidden).toBe(false); expect(ui.card.querySelectorAll('img')).toHaveLength(0);
     const nodes = ui.card as unknown as Node; const all = (n: Node): Node[] => [n, ...n.children.flatMap(all)];

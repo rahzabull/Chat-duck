@@ -16,6 +16,7 @@ const driver = vi.hoisted(() => ({
   point: { x: 1736, y: 1030 }, idle: 0,
   drag: (_point: Point) => {}, sample: (_sample: ForegroundSample) => {}, status: (_active: boolean) => {},
   configure: vi.fn(), dispose: vi.fn(),
+  captureForeground: vi.fn((ready: (hwnd?: string) => void) => ready('12345')), restoreForeground: vi.fn(() => true),
 }));
 vi.mock('electron', () => ({
   app: { isPackaged: false, getVersion: () => 'test', getAppMetrics: () => [], setLoginItemSettings: vi.fn() },
@@ -29,6 +30,7 @@ vi.mock('../src/main/platform/cursor', () => ({ CursorPoller: class {
   configure() {} stop() {}
 } }));
 vi.mock('../src/main/platform/awareness', () => ({ AppAwareness: class {
+  captureForeground = driver.captureForeground; restoreForeground = driver.restoreForeground;
   constructor(sample: (value: ForegroundSample) => void, status: (active: boolean) => void) { driver.sample = sample; driver.status = status; }
   configure(active: boolean, identity: boolean) { driver.configure(active && identity); if (!active) driver.status(false); }
   dispose() { driver.dispose(); driver.status(false); }
@@ -61,6 +63,15 @@ beforeEach(() => {
 afterEach(() => { controller?.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('controller personality wiring', () => {
+  it('restores the captured window before dropping focusability without hiding', () => {
+    create(); controller.captureConversationFocus(vi.fn());
+    controller.state.productivity = { focus: { kind: 'focus' } } as ProductivityView; // A running focus timer must not retain keyboard focus.
+    window.setFocusable.mockClear(); window.hide.mockClear(); window.showInactive.mockClear();
+    controller.releaseConversationFocus();
+    expect(driver.restoreForeground).toHaveBeenCalledWith('12345');
+    expect(driver.restoreForeground.mock.invocationCallOrder[0]).toBeLessThan(window.setFocusable.mock.invocationCallOrder[0]);
+    expect(window.setFocusable).toHaveBeenCalledWith(false); expect(window.hide).not.toHaveBeenCalled(); expect(window.showInactive).not.toHaveBeenCalled();
+  });
   it('anchors productivity cards and keeps focus quiet while reminders can turn and alarm', () => {
     create({ mute: true, talkativeness: 'quiet' });
     const base = window.setBounds.mock.calls.at(-1)![0];

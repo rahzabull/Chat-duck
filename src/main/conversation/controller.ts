@@ -21,6 +21,7 @@ export class ConversationController {
   private idle?: ReturnType<typeof setTimeout>; private blur?: ReturnType<typeof setTimeout>; private thinking?: ReturnType<typeof setTimeout>; private transition?: ReturnType<typeof setTimeout>;
   private focusTimer?: ReturnType<typeof setTimeout>;
   private focusBlocked = false; private activatingFocus = false; private disposed = false;
+  private opening = false; private openRequest = 0;
   private engine?: ConversationEngine; private registry: ToolRegistry;
   private retrieval = new KeywordRetrieval(); private epoch = 0;
   private summaryEpoch = 0;
@@ -81,9 +82,17 @@ export class ConversationController {
   }
   private touch(): void { clearTimeout(this.idle); this.idle = setTimeout(() => this.end(), 90000); }
   open(): void {
-    if (this.disposed) return;
+    if (this.disposed || this.opening) return;
+    if (this.view.active) { this.activate(); return; }
+    this.opening = true; const request = ++this.openRequest;
+    this.companion.captureConversationFocus(() => {
+      if (this.disposed || request !== this.openRequest) return;
+      this.opening = false; this.activate();
+    });
+  }
+  private activate(): void {
     this.productivity?.open(null);
-    // Stay in the hotkey/click callback's synchronous activation window.
+    // Capture the previous foreground window before any activation calls.
     const window = this.companion.window;
     this.focusBlocked = false; this.view.focusFailed = false; clearTimeout(this.focusTimer);
     this.activatingFocus = true;
@@ -216,11 +225,12 @@ export class ConversationController {
     } finally { if (epoch === this.epoch) { clearTimeout(this.thinking); this.thinking = undefined; } }
   }
   end(save = true): void {
+    this.openRequest++; this.opening = false;
     this.cancel(); if (!this.view.active) return;
     clearTimeout(this.idle); clearTimeout(this.blur); clearTimeout(this.transition); clearTimeout(this.focusTimer);
     this.view.active = false; this.view.state = 'conversation_end'; this.view.panel = false; this.view.reply = save && Math.random() < .4 ? line('talk_signoff') : ''; this.view.revision++;
     this.view.inputReady = false; this.view.focusFailed = false; this.view.forceBubble = false; this.focusBlocked = false;
-    // Let Windows activate the next window in z-order; no native handle capture.
+    // Restore the captured foreground window before relinquishing focusability.
     this.companion.releaseConversationFocus();
     const turns = this.turns; const modelTurns = this.modelTurns; this.turns = []; this.modelTurns = []; this.confirmation = undefined; this.choices = undefined; this.lastSaved = undefined;
     this.publish();

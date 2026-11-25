@@ -9,6 +9,36 @@ function fakeChild() {
 }
 afterEach(() => vi.useRealTimers());
 describe('foreground helper lifecycle', () => {
+  it('captures an immediate HWND before the next sample and restores only validated handles', () => {
+    const child = fakeChild(); const sample = vi.fn(); const sent: string[] = [];
+    child.stdin.on('data', chunk => sent.push(String(chunk)));
+    const helper = new AppAwareness(sample, vi.fn(), () => [42], vi.fn(() => child) as unknown as typeof spawn);
+    helper.configure(true, false); child.stdout.write('unknown|0|111\n');
+    expect(sample).toHaveBeenLastCalledWith({ app: null, fullscreen: false });
+    const ready = vi.fn(); helper.captureForeground(ready); expect(sent.at(-1)).toBe('fg\n'); expect(ready).not.toHaveBeenCalled();
+    child.stdout.write('hwnd|22'); child.stdout.write('2\r\n'); expect(ready).toHaveBeenCalledWith('222');
+    expect(sample).toHaveBeenCalledOnce(); expect(helper.restoreForeground('222')).toBe(true); expect(sent.at(-1)).toBe('restore 222\n');
+    for (const value of ['', '0', '-1', '1.2', '1\nfg', '123\n', '123\r', ' 123', '１２３', '9223372036854775808']) expect(helper.restoreForeground(value)).toBe(false);
+    expect(sent.filter(s => s.startsWith('restore'))).toEqual(['restore 222\n']); helper.dispose(); child.emit('close');
+  });
+  it('falls back to the last sampled handle on timeout or unavailable helper, with no handle on a fresh start', () => {
+    vi.useFakeTimers(); const child = fakeChild();
+    const helper = new AppAwareness(vi.fn(), vi.fn(), () => [], vi.fn(() => child) as unknown as typeof spawn);
+    const ready = vi.fn(); helper.captureForeground(ready); expect(ready).toHaveBeenLastCalledWith(undefined);
+    helper.configure(true); child.stdout.write('private|0|456\n'); helper.captureForeground(ready);
+    child.stdout.write('hwnd|-1\nhwnd|12x\nunknown|0|123\n');
+    vi.advanceTimersByTime(150); expect(ready).toHaveBeenLastCalledWith('123');
+    helper.configure(false); child.emit('close'); helper.captureForeground(ready); expect(ready).toHaveBeenLastCalledWith('123');
+    expect(helper.restoreForeground('123')).toBe(false);
+    helper.dispose(); helper.captureForeground(ready); expect(ready).toHaveBeenLastCalledWith(undefined); expect(vi.getTimerCount()).toBe(0);
+  });
+  it('keeps foreground commands independent of identity lookup and restricts the input grammar', () => {
+    const script = awarenessScript(123, [], false);
+    expect(script).toContain('line == "fg"'); expect(script).toContain('Console.Out.WriteLine("hwnd|" + GetForegroundWindow().ToInt64())');
+    expect(script).toContain('\\Arestore [0-9]+\\z'); expect(script).toContain('\\A[0-9]+(,[0-9]+)*\\z');
+    expect(script).toContain('if (IsWindow(hwnd)) SetForegroundWindow(hwnd)');
+    expect(script).not.toContain('QueryFullProcessImageName'); expect(script).not.toContain('GetWindowThreadProcessId');
+  });
   it('switches geometry/identity modes without recursion, overlap or leaking names', () => {
     const children = [fakeChild(), fakeChild(), fakeChild()];
     const launch = vi.fn().mockReturnValueOnce(children[0]).mockReturnValueOnce(children[1]).mockReturnValueOnce(children[2]);

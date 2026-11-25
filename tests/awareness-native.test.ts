@@ -27,6 +27,10 @@ it.skipIf(process.platform !== 'win32' || process.env.DUCKY_NATIVE_HELPER_TEST !
     ]);
     expect(result, stderr || 'No valid helper sample').toBe('sample');
     expect(sampleTimes[1] - sampleTimes[0]).toBeGreaterThanOrEqual(2900);
+    // Command is handled by the resident reader, not the three-second sample loop.
+    const capturedAt = Date.now();
+    await new Promise<void>(resolve => helper.captureForeground(() => resolve()));
+    expect(Date.now() - capturedAt).toBeLessThan(150);
     helper.configure(false);
     await exited;
     expect(child!.exitCode !== null || child!.signalCode !== null).toBe(true);

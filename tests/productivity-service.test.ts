@@ -14,6 +14,12 @@ afterEach(() => { service.dispose(); rmSync(directory, { recursive: true, force:
 async function action(name: string, args: Record<string, unknown> = {}, token?: string) { const p = service.action({ name, args, token }); await vi.advanceTimersByTimeAsync(300); return p; }
 async function local(text: string) { const p = service.local(text); await vi.advanceTimersByTimeAsync(300); return p; }
 describe('AI-independent productivity orchestration', () => {
+  it('uses the shared plain-words reminder label in confirmations', async () => {
+    const result = await action('add_reminder', { text: 'water', at: new Date(2026, 10, 25, 16, 17, 59).toISOString() });
+    expect(result.message).toBe('Reminder saved: water — Today, 4:17 PM');
+    const repeating = await action('add_reminder', { text: 'water', at: new Date(2026, 11, 1, 9).toISOString(), recurrence: { kind: 'weekly', weekdays: [2] } });
+    expect(repeating.message).toBe('Reminder saved: water — Every Tuesday, 9:00 AM');
+  });
   it('creates and edits tasks, disambiguates titles, and celebrates completion', async () => {
     expect((await local('add campaign presentation tomorrow'))?.ok).toBe(true); await local('add campaign budget Friday');
     expect((await local('mark campaign done'))?.message).toContain('1. campaign presentation');

@@ -24,6 +24,7 @@ function setup(aiEnabled = false, productivity?: ProductivityService) {
   const call = (name: string) => vi.fn(() => { calls.push(name); });
   const window = Object.assign(new EventEmitter(), { calls, setFocusable: vi.fn((value: boolean) => { calls.push(`focusable:${value}`); }), focus: call('focus'), show: call('show'), hide: call('hide'), showInactive: call('showInactive'), setAlwaysOnTop: vi.fn((_value: boolean, _level: string) => { calls.push('topmost'); }), moveTop: call('moveTop'), webContents: { focus: call('contents.focus') }, isFocused: () => driver.focused });
   const companion = { state: { settings: { ...DEFAULT_SETTINGS, aiEnabled, aiModel: 'qwen3:8b' } } as CompanionState, window,
+    captureConversationFocus: vi.fn((ready: () => void) => ready()),
     releaseConversationFocus: vi.fn(() => { window.setFocusable(false); window.hide(); window.showInactive(); window.setAlwaysOnTop(companion.state.settings.alwaysOnTop && !companion.state.settings.desktopOnly, 'screen-saver'); }),
     setConversationInference: vi.fn(), beginConversation: vi.fn(), finishConversation: vi.fn(), muteFor: vi.fn(),
     presentConversation: vi.fn((view: NonNullable<CompanionState['conversation']>) => { companion.state.conversation = view; calls.push(view.inputReady ? 'renderer:focus' : 'renderer:waiting'); }),
@@ -37,6 +38,17 @@ beforeEach(() => {
 });
 afterEach(() => { service?.dispose(); rmSync(directory, { recursive: true, force: true }); vi.useRealTimers(); });
 describe('conversation main controller', () => {
+  it('captures before activating, does not recapture on refocus, and cancels a pending open', () => {
+    const companion = setup(); let ready!: () => void;
+    companion.captureConversationFocus.mockImplementation(callback => { ready = callback; });
+    service.open(); service.open();
+    expect(companion.captureConversationFocus).toHaveBeenCalledOnce(); expect(companion.window.focus).not.toHaveBeenCalled();
+    ready(); expect(companion.window.focus).toHaveBeenCalledOnce();
+    service.open(); expect(companion.captureConversationFocus).toHaveBeenCalledOnce();
+    service.end(); service.open(); service.end();
+    const activations = companion.window.focus.mock.calls.length;
+    ready(); expect(companion.window.focus).toHaveBeenCalledTimes(activations);
+  });
   it('routes productivity ahead of AI and leaves user data intact when memory is forgotten', async () => {
     const data = new ProductivityStore(directory); const productivity = new ProductivityService(data, { changed: vi.fn(), attention: vi.fn(), notify: vi.fn(), export: vi.fn(), doNotDisturb: () => false });
     const companion = setup(false, productivity); service.open();

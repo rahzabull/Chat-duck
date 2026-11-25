@@ -1,18 +1,13 @@
 import type { CompanionState } from '../../shared/types';
 import { localDate, type ProductivityView, type Reminder, type Task } from '../../core/productivity/types';
+import { reminderLabel } from '../../core/productivity/presentation';
+export { reminderLabel } from '../../core/productivity/presentation';
 
 /** All data enters textContent/value. No HTML interpretation of user or model text. */
 export function element<K extends keyof HTMLElementTagNameMap>(tag: K, text = ''): HTMLElementTagNameMap[K] { const node = document.createElement(tag); node.textContent = text; return node; }
 function button(label: string, fn: () => void): HTMLButtonElement { const b = element('button', label); b.type = 'button'; b.onclick = fn; return b; }
 function field(label: string, value = '', multiline = false): HTMLInputElement | HTMLTextAreaElement {
   const input = multiline ? element('textarea') : element('input'); input.value = value; input.setAttribute('aria-label', label); input.placeholder = label; input.maxLength = multiline ? 20000 : 4000; return input;
-}
-export function reminderLabel(r: Reminder): string {
-  const date = new Date(r.state === 'due' && r.lastFiredAt ? r.lastFiredAt : r.snoozedUntil ?? r.at); const today = localDate(new Date()); const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-  const when = localDate(date) === today ? 'Today' : localDate(date) === localDate(tomorrow) ? 'Tomorrow' : date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); const rule = r.recurrence;
-  const repeat = rule?.kind === 'daily' ? 'Every day' : rule?.kind === 'weekly' ? `Every ${rule.weekdays!.map(n => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][n]).join(', ')}` : rule?.kind === 'monthly' ? `Every month, day ${rule.dayOfMonth} (last day if shorter)` : rule?.kind === 'custom' ? `Every ${rule.intervalDays} days` : '';
-  return `${r.snoozedUntil ? 'Snoozed until ' : ''}${when}, ${time}${repeat ? ` · ${repeat}` : ''}`;
 }
 export class ProductivityUI {
   readonly card = element('section'); readonly badge = element('section');
@@ -104,8 +99,13 @@ export class ProductivityUI {
     for (const tab of ['today', 'upcoming', 'overdue', 'done']) { const b = button(tab[0].toUpperCase() + tab.slice(1), () => { this.tab = tab; this.renderCard(); }); b.setAttribute('aria-pressed', String(this.tab === tab)); tabs.append(b); }
     this.card.append(tabs); const search = field('Search tasks', this.search); search.oninput = () => { this.search = search.value; this.renderCard(); }; this.card.append(search);
     const today = localDate(new Date()); const end = new Date(); end.setDate(end.getDate() + 7); const week = localDate(end);
-    const tasks = this.view!.tasks.filter(t => t.title.toLowerCase().includes(this.search.toLowerCase())).filter(t => this.tab === 'done' ? t.done : !t.done && (this.tab === 'today' ? t.due === today : this.tab === 'overdue' ? !!t.due && t.due < today : this.tab === 'week' ? !!t.due && t.due >= today && t.due <= week : !t.due || t.due >= today));
-    for (const task of tasks) this.taskRow(task);
+    const tasks = this.view!.tasks.filter(t => t.title.toLowerCase().includes(this.search.toLowerCase())).filter(t => this.tab === 'done' ? t.done : !t.done && (this.tab === 'today' ? !t.due || t.due <= today : this.tab === 'overdue' ? !!t.due && t.due < today : this.tab === 'week' ? !!t.due && t.due >= today && t.due <= week : !t.due || t.due >= today));
+    if (this.tab === 'today') {
+      for (const task of tasks.filter(t => t.due)) this.taskRow(task);
+      const undated = tasks.filter(t => !t.due);
+      if (undated.length) this.card.append(element('h3', 'No date'));
+      for (const task of undated) this.taskRow(task);
+    } else for (const task of tasks) this.taskRow(task);
     if (!tasks.length) this.card.append(element('p', 'Nothing here. A rare moment of peace.'));
     this.form(this.card, '+ Add task', text => this.run('text', { text: `add ${text}` }));
     if (this.tab === 'done') this.card.append(button('Clear completed', () => { void this.run('clear_completed'); }));
@@ -115,6 +115,7 @@ export class ProductivityUI {
     done.onchange = () => { void this.run('update_task', { id: task.id, done: done.checked }); };
     const title = field(`Title: ${task.title}`, task.title); title.onchange = () => { void this.run('update_task', { id: task.id, title: title.value }); };
     line.append(done, title); line.className = 'task-title'; row.append(line);
+    if (!task.done && task.due && task.due < localDate(new Date())) row.append(element('small', 'Overdue'));
     const due = field(`Due: ${task.title}`, task.due ? `${task.due}${task.dueTime ? ` ${task.dueTime}` : ''}` : ''); due.placeholder = 'Due: tomorrow 9am'; due.onchange = () => { void this.run('update_task', { id: task.id, dueInput: due.value }); };
     const priority = button(`Priority: ${task.priority}`, () => { void this.run('update_task', { id: task.id, priority: task.priority === 'normal' ? 'high' : task.priority === 'high' ? 'low' : 'normal' }); });
     row.append(due, priority);
