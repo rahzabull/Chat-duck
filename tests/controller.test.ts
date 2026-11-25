@@ -333,3 +333,78 @@ describe('Milestone 3 controller integration', () => {
     } finally { process.argv = original; Object.defineProperty(app, 'isPackaged', { value: false, configurable: true }); }
   });
 });
+
+
+describe('Phase C main mode integration', () => {
+  it('keeps geometry alive across a native gaming hide and returns after five seconds', () => {
+    create(); window.hide.mockImplementation(() => { window.emit('hide'); });
+    driver.sample({ app: null, fullscreen: true }); vi.advanceTimersByTime(9999);
+    expect(controller.state.gaming).toBe(false); vi.advanceTimersByTime(1);
+    expect(controller.state.mode).toBe('gaming'); expect(controller.state.visible).toBe(true);
+    expect(window.hide).toHaveBeenCalled(); expect(controller.notificationsOnly()).toBe(true);
+    driver.sample({ app: null, fullscreen: false }); vi.advanceTimersByTime(4999);
+    expect(controller.state.gaming).toBe(true); vi.advanceTimersByTime(1001);
+    expect(controller.state.gaming).toBe(false); expect(window.showInactive).toHaveBeenCalled();
+  });
+  it('freezes instead of hiding when configured and preserves a user hide on exit', () => {
+    create({ gamingBehaviour: 'freeze' }); window.hide.mockClear();
+    driver.sample({ app: null, fullscreen: true }); vi.advanceTimersByTime(10000);
+    expect(controller.state.gaming).toBe(true); expect(window.hide).not.toHaveBeenCalled();
+    controller.setVisible(false); window.showInactive.mockClear();
+    driver.sample({ app: null, fullscreen: false }); vi.advanceTimersByTime(6000);
+    expect(controller.state.visible).toBe(false); expect(window.showInactive).not.toHaveBeenCalled();
+  });
+  it('expires DND while hidden and keeps privacy priority without losing DND restrictions', () => {
+    create(); controller.updateSettings({ privacyMode: true, dndUntil: Date.now() + 60000 });
+    expect(controller.state.mode).toBe('privacy'); expect(controller.state.dnd).toBe(true);
+    requestSituation('click_angry'); internals().performActivity('dance');
+    expect(controller.state.bubble).toBeNull(); expect(controller.state.animation).toBe('idle');
+    controller.productivityAttention('celebrate', 'task_done'); expect(controller.state.productivitySpeech).toBeUndefined();
+    controller.setVisible(false); vi.advanceTimersByTime(60000);
+    expect(controller.state.dnd).toBe(false); expect(controller.state.mode).toBe('privacy'); expect(controller.state.settings.dndUntil).toBe(0);
+  });
+  it.each(['dnd', 'privacy', 'gaming'] as const)('aborts ambient AI, blocks diagnostics and suppresses stale results in %s', async mode => {
+    const fetcher = await createWithAI(); driver.status(true);
+    let complete!: (response: Response) => void;
+    fetcher.mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    requestSituation('thought'); const signal = fetcher.mock.calls.at(-1)![1]!.signal!;
+    if (mode === 'dnd') controller.updateSettings({ dndUntil: -1 });
+    else if (mode === 'privacy') controller.updateSettings({ privacyMode: true });
+    else { driver.sample({ app: null, fullscreen: true }); vi.advanceTimersByTime(10000); }
+    expect(signal.aborted).toBe(true); fetcher.mockClear(); await controller.testAI();
+    expect(fetcher).not.toHaveBeenCalled();
+    complete(new Response(JSON.stringify({ message: { content: aiJSON() } }))); await flushAI();
+    expect(controller.state.bubble).not.toBe(aiLine); expect(controller.state.brain.phase).toBe('suspended');
+    if (mode === 'privacy') { expect(controller.state.sunglasses).toBe(true); expect(controller.state.awarenessActive).toBe(false); expect(driver.configure).toHaveBeenLastCalledWith(false); }
+  });
+  it('uses only high-priority reminders during DND and keeps the body calm', () => {
+    create({ dndUntil: -1, dndReminders: 'bubble' });
+    requestSituation('first_launch'); expect(controller.state.bubble).toBeNull();
+    controller.productivityAttention('alarm', 'reminder_due');
+    expect(controller.state.productivitySpeech).toBeTruthy(); expect(controller.state.animation).toBe('idle');
+    controller.updateSettings({ dndReminders: 'notification' });
+    expect(controller.notificationsOnly()).toBe(true); expect(controller.state.productivitySpeech).toBeUndefined();
+  });
+  it('debug morning briefing runs through interruption gates only in development', () => {
+    const original = process.argv;
+    const view: ProductivityView = { revision: 1, card: null, tasks: [], reminders: [], notes: [], settings: { ...FOCUS_DEFAULTS }, queue: 0, message: '' };
+    try {
+      process.argv = [...original, '--debug-proactive', 'briefing_morning'];
+      create({ mute: true }); controller.presentProductivity(view); vi.advanceTimersByTime(2000); expect(controller.state.bubble).toBeNull();
+      controller.updateSettings({ mute: false }); vi.advanceTimersByTime(2000);
+      expect(controller.state.bubble).toContain('0 tasks'); expect(controller.state.proactive?.label).toBe('Today');
+      const action = vi.fn(); controller.onProactiveAction = action; controller.proactiveAction(true);
+      expect(action).toHaveBeenCalledWith({ kind: 'today' }); expect(controller.state.proactive).toBeUndefined();
+      controller.dispose(); Object.defineProperty(app, 'isPackaged', { value: true, configurable: true });
+      create(); controller.presentProductivity(view); vi.advanceTimersByTime(2000); expect(controller.state.proactive).toBeUndefined();
+    } finally { process.argv = original; Object.defineProperty(app, 'isPackaged', { value: false, configurable: true }); }
+  });
+});
+
+
+it('releases an in-progress drag when DND takes over and remains calm', () => {
+  create(); controller.startDrag({ x: 160, y: 250 }); driver.point = { x: 1600, y: 700 }; driver.drag(driver.point);
+  expect(controller.state.dragging).toBe(true); controller.updateSettings({ dndUntil: -1 });
+  expect(controller.state.dragging).toBe(false); expect(controller.state.animation).toBe('idle');
+  vi.advanceTimersByTime(2000); expect(controller.state.animation).toBe('idle'); expect(controller.state.bubble).toBeNull();
+});

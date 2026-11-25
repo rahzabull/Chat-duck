@@ -1,3 +1,4 @@
+import { ExpansionSettings } from './expansion';
 import { ConversationSettings, MemoryEditor } from './conversation';
 import { ProductivitySettings } from './productivity';
 import { createElement as h, useEffect, useState, type ChangeEvent } from 'react';
@@ -77,6 +78,7 @@ function SettingsApp() {
       state.brain.version && h('p', { className: 'hint' }, `Ollama ${state.brain.version}`),
       state.brain.sample && h('p', { className: 'hint' }, `Sample: ${state.brain.sample}`),
       h('p', { className: 'hint' }, 'Install Ollama and pull a model yourself, then test the connection to refresh this list. Ducky never downloads models.')),
+    h(ExpansionSettings, { state, save }),
     h(ConversationSettings, { state, save }),
     h(ProductivitySettings, { state }),
     h('section', { 'aria-labelledby': 'memory' }, h('h2', { id: 'memory' }, 'Memory'),

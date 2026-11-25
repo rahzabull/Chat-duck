@@ -14,6 +14,7 @@ export class ConversationUI {
   private inputReady = false; private focusRequest = -1;
   private focusFailed = false;
   private cardOpen = false;
+  private draftRevision = -1;
   private copy: HTMLButtonElement;
   constructor(private host: HTMLElement, private bubble: HTMLButtonElement, private adapter: CharacterSurface) {
     this.input.id = 'talk-input'; this.input.rows = 1; this.input.maxLength = 4000;
@@ -87,6 +88,7 @@ export class ConversationUI {
     if (this.active) {
       this.input.hidden = !ready;
       if (!this.wasActive) this.input.value = '';
+      if (view?.draft && view.draft.revision !== this.draftRevision) { this.input.value = view.draft.text; this.draftRevision = view.draft.revision; }
       if (ready && this.focusRequest !== view?.focusRequest) {
         this.focusRequest = view?.focusRequest ?? 0;
         requestAnimationFrame(() => { if (this.inputReady) this.input.focus(); });

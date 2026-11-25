@@ -2,6 +2,17 @@ export interface Point { x: number; y: number }
 export interface WorkArea extends Point { width: number; height: number; id: number }
 export type Direction = 'left' | 'right';
 export interface Settings {
+  skillPack: import('../../core/skills').SkillPack;
+  privacyMode: boolean;
+  /** 0 = off, -1 = until disabled, otherwise epoch milliseconds. */
+  dndUntil: number;
+  gamingBehaviour: 'hide' | 'freeze';
+  dndReminders: 'notification' | 'bubble';
+  quietHoursEnabled: boolean; quietHoursStart: string; quietHoursEnd: string;
+  morningBriefing: boolean; briefingStart: string; briefingEnd: string;
+  eveningSummary: boolean; deadlineNudges: boolean; assistanceOffers: boolean;
+  /** Delivery markers only; no titles or app identities. */
+  proactiveHistory: Record<string, number>;
   conversationShortcut: string;
   conversationRetention: import('../../core/conversation/types').Retention;
   personality: 'wholesome' | 'playful' | 'sarcastic' | 'unhinged';
@@ -27,7 +38,7 @@ export interface Settings {
   firstLaunchDone: boolean;
   position: Point | null;
 }
-export type EditableSettings = Omit<Settings, 'firstLaunchDone' | 'position' | 'installSeed' | 'dailyMood'>;
+export type EditableSettings = Omit<Settings, 'firstLaunchDone' | 'position' | 'installSeed' | 'dailyMood' | 'proactiveHistory'>;
 export interface BrainState {
   phase: 'disabled' | 'offline' | 'warming' | 'connected' | 'error' | 'suspended';
   message: string;
@@ -36,6 +47,9 @@ export interface BrainState {
   sample?: string;
 }
 export interface CompanionState {
+  mode?: import('../../core/modes').Mode;
+  gaming?: boolean; dnd?: boolean;
+  proactive?: { label: string; detail?: string; dismissLabel: string };
   productivity?: import('../../core/productivity/types').ProductivityView;
   productivitySpeech?: string;
   conversation?: import('../../core/conversation/types').ConversationView;
@@ -48,7 +62,7 @@ export interface CompanionState {
   bubble: string | null; settings: Settings; debugHitbox: boolean; version: string;
 }
 export interface CursorUpdate { cursor: Point; origin: Point }
-export type Command = 'talk' | 'tasks' | 'add-task' | 'add-reminder' | 'focus' | 'notes' | 'show' | 'hide' | 'pause' | 'mute' | 'reset' | 'settings' | 'quit';
+export type Command = 'proactive-accept' | 'proactive-later' | 'privacy' | 'dnd-off' | 'dnd-30' | 'dnd-60' | 'dnd-until-off' | 'talk' | 'tasks' | 'add-task' | 'add-reminder' | 'focus' | 'notes' | 'show' | 'hide' | 'pause' | 'mute' | 'reset' | 'settings' | 'quit';
 export interface DuckyAPI {
   readonly placeholderDuck?: boolean;
   productivity(action: import('../../core/productivity/types').ProductivityAction): Promise<import('../../core/productivity/types').ProductivityResult>;

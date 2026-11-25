@@ -41,6 +41,11 @@ function showSettings(): void {
 function command(command: Command): void {
   if (!controller) return;
   switch (command) {
+    case 'privacy': controller.updateSettings({ privacyMode: !controller.state.settings.privacyMode }); conversation?.configure(); break;
+    case 'dnd-off': case 'dnd-30': case 'dnd-60': case 'dnd-until-off':
+      controller.updateSettings({ dndUntil: command === 'dnd-off' ? 0 : command === 'dnd-until-off' ? -1 : Date.now() + (command === 'dnd-30' ? 30 : 60) * 60000 }); conversation?.configure(); break;
+    case 'proactive-accept': controller.proactiveAction(true); break;
+    case 'proactive-later': controller.proactiveAction(false); break;
     case 'tasks': case 'notes': case 'add-task': case 'add-reminder':
       controller.setVisible(true); productivity?.open(command); controller.window.setFocusable(true); controller.window.show(); controller.window.focus(); break;
     case 'focus': void productivity?.action({ name: 'start_focus', args: { minutes: 25 } }); break;
@@ -84,13 +89,14 @@ else {
     productivity = new ProductivityService(new ProductivityStore(app.getPath('userData')), {
       changed: view => controller?.presentProductivity(view),
       attention: (kind, text) => controller?.productivityAttention(kind, text),
-      doNotDisturb: () => false, // Future DND gate: durable delivery queues wait here.
+      doNotDisturb: () => controller?.notificationsOnly() ?? false,
+      notificationOnly: () => controller?.notificationsOnly() ?? false,
       copy: text => clipboard.writeText(text),
       notify: (reminder, click) => {
-        if (!Notification.isSupported()) return;
+        if (!Notification.isSupported()) return false;
         const notification = new Notification({ title: 'Ducky reminder', body: reminder.text, silent: true });
         notification.on('click', () => { controller?.setVisible(true); click(); controller?.window.setFocusable(true); controller?.window.show(); controller?.window.focus(); });
-        notification.show();
+        notification.show(); return true;
       },
       export: async (kind, data, format) => {
         const result = await dialog.showSaveDialog({ title: `Export ${kind}`, defaultPath: `Ducky-${kind}.${format}`, filters: [{ name: format === 'json' ? 'JSON' : 'Text', extensions: [format] }] });
@@ -102,10 +108,15 @@ else {
     conversation = new ConversationController(controller, new ConversationStore(app.getPath('userData'), store.value.memoryEnabled, store.value.conversationRetention), productivity);
     controller.window.once('ready-to-show', () => productivity?.start());
     controller.onConversationClose = () => conversation?.end();
-    tray = new DuckyTray(() => controller!.state, command);
+    controller.onModeChanged = () => { conversation?.modeChanged(); if (controller?.aiBlocked()) productivity?.open(null); };
+    controller.onProactiveAction = action => {
+      if (action.kind === 'plan') conversation?.openWithPrompt(action.prompt);
+      else { productivity?.open('tasks', undefined, action.kind === 'today' ? 'today' : 'overdue'); controller?.window.setFocusable(true); controller?.window.show(); controller?.window.focus(); }
+    };
+    tray = new DuckyTray(() => controller!.state, command, patch => { controller?.updateSettings(patch); conversation?.configure(); });
     let menuKey = '';
     controller.onChanged = () => {
-      const state = controller!.state; const key = `${state.visible}:${state.paused}:${state.settings.mute}`;
+      const state = controller!.state; const key = `${state.visible}:${state.paused}:${state.settings.mute}:${state.mode}:${state.dnd}:${state.settings.dndUntil}:${state.settings.privacyMode}:${state.settings.skillPack}`;
       if (key !== menuKey) { menuKey = key; tray?.refresh(); }
     };
     disposeIPC = registerIPC(controller, () => settingsWindow, command, () => tray?.popup(), conversation, productivity);

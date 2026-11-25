@@ -1,3 +1,4 @@
+import { SKILL_PACKS } from '../../core/skills';
 import { clipboard, dialog, globalShortcut } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -50,7 +51,7 @@ export class ConversationController {
   }
   configure(): void {
     const s = this.companion.state.settings;
-    const config = JSON.stringify([s.aiEnabled, s.aiModel, s.ollamaPort, s.memoryEnabled, s.conversationRetention, s.personality, s.profanity, s.preferredName]);
+    const config = JSON.stringify([s.aiEnabled, s.aiModel, s.ollamaPort, s.memoryEnabled, s.conversationRetention, s.personality, s.profanity, s.preferredName, s.skillPack, s.privacyMode, s.dndUntil]);
     if (this.config !== config) {
       this.config = config; this.cancel(); this.engine = new ConversationEngine(new OllamaProvider(s.ollamaPort), this.registry);
       this.confirmation = undefined; this.choices = undefined;
@@ -81,12 +82,20 @@ export class ConversationController {
     this.companion.window.setAlwaysOnTop(s.alwaysOnTop && !s.desktopOnly, 'screen-saver');
   }
   private touch(): void { clearTimeout(this.idle); this.idle = setTimeout(() => this.end(), 90000); }
+  private opener?: string;
+  private draftRevision = 0;
+  openWithPrompt(prompt: string): void { if (this.companion.aiBlocked()) return; this.opener = prompt; this.open(); }
+  modeChanged(): void {
+    this.cancel();
+    if (this.companion.state.settings.privacyMode) this.modelTurns = [];
+    if (this.companion.aiBlocked()) this.end();
+  }
   open(): void {
-    if (this.disposed || this.opening) return;
+    if (this.disposed || this.opening || this.companion.aiBlocked()) return;
     if (this.view.active) { this.activate(); return; }
     this.opening = true; const request = ++this.openRequest;
     this.companion.captureConversationFocus(() => {
-      if (this.disposed || request !== this.openRequest) return;
+      if (this.disposed || request !== this.openRequest || this.companion.aiBlocked()) return;
       this.opening = false; this.activate();
     });
   }
@@ -107,6 +116,7 @@ export class ConversationController {
       this.view.inputReady = false;
       this.show(line('talk_greeting'), 'listening', false);
     }
+    if (this.opener) { this.view.draft = { text: this.opener, revision: ++this.draftRevision }; this.opener = undefined; this.publish(); }
     this.focusInput(); this.touch();
     this.focusTimer = setTimeout(() => {
       if (!this.view.active || this.disposed) return;
@@ -163,12 +173,17 @@ export class ConversationController {
   async send(input: string): Promise<void> {
     if (!this.view.active || !this.view.inputReady) return;
     const text = cleanText(input); if (text.length > 4000) return;
+    this.view.draft = undefined;
     this.cancel(); clearTimeout(this.transition); this.touch(); const epoch = this.epoch;
     // A new request replaces the previous temporary card; local intents may open a new one.
     this.productivity?.open(null);
     this.view.reply = ''; this.view.panel = false; this.view.revision++; this.view.state = 'thinking'; this.publish();
     this.turns.push({ role: 'user', text, at: Date.now() }); this.turns = this.turns.slice(-200);
     try {
+      const modeIntent = parseIntent(text);
+      if (modeIntent.kind === 'dnd') { this.companion.updateSettings({ dndUntil: modeIntent.enabled ? modeIntent.minutes ? Date.now() + modeIntent.minutes * 60000 : -1 : 0 }); this.end(); return; }
+      if (modeIntent.kind === 'privacy') { this.modelTurns = []; this.companion.updateSettings({ privacyMode: modeIntent.enabled }); this.show(modeIntent.enabled ? 'Privacy mode is on. App awareness is stopped.' : 'Privacy mode is off. Your app awareness preference applies again.'); return; }
+      if (this.companion.aiBlocked()) { this.end(false); return; }
       if (this.choices && /^(?:\d+|all|none)$/i.test(text)) {
         const choices = this.choices;
         if (/^none$/i.test(text)) { this.choices = undefined; this.show('Nothing deleted.'); return; }
@@ -209,7 +224,7 @@ export class ConversationController {
         case 'end': this.end(); return;
       }
       const s = this.companion.state.settings;
-      if (!s.aiEnabled || !s.aiModel) { this.show(line('talk_offline'), 'unsure'); return; }
+      if (!s.aiEnabled || !s.aiModel) { const pack = SKILL_PACKS[s.skillPack]; this.show(s.skillPack === 'companion' ? line('talk_offline') : `${pack.lines[Math.floor(Math.random() * pack.lines.length)]} ${pack.opener} Local AI is off; tasks, reminders and notes still work.`, 'unsure'); return; }
       // Local commands are archived but never replayed as model requests.
       this.modelTurns.push({ role: 'user', text, at: Date.now() });
       this.modelTurns = this.modelTurns.slice(-200);
@@ -225,10 +240,10 @@ export class ConversationController {
     } finally { if (epoch === this.epoch) { clearTimeout(this.thinking); this.thinking = undefined; } }
   }
   end(save = true): void {
-    this.openRequest++; this.opening = false;
+    this.openRequest++; this.opening = false; this.opener = undefined; this.view.draft = undefined;
     this.cancel(); if (!this.view.active) return;
     clearTimeout(this.idle); clearTimeout(this.blur); clearTimeout(this.transition); clearTimeout(this.focusTimer);
-    this.view.active = false; this.view.state = 'conversation_end'; this.view.panel = false; this.view.reply = save && Math.random() < .4 ? line('talk_signoff') : ''; this.view.revision++;
+    this.view.active = false; this.view.state = 'conversation_end'; this.view.panel = false; this.view.reply = save && !this.companion.aiBlocked() && Math.random() < .4 ? line('talk_signoff') : ''; this.view.revision++;
     this.view.inputReady = false; this.view.focusFailed = false; this.view.forceBubble = false; this.focusBlocked = false;
     // Restore the captured foreground window before relinquishing focusability.
     this.companion.releaseConversationFocus();
@@ -240,7 +255,7 @@ export class ConversationController {
       try { this.store.saveConversation(conversation); }
       catch { this.view.reply = 'I couldn’t save this conversation.'; this.view.revision++; this.publish(); return; }
       const s = this.companion.state.settings; const generation = this.store.generation;
-      if (modelTurns.length && s.aiEnabled && s.aiModel && !this.disposed) {
+      if (!this.companion.aiBlocked() && modelTurns.length && s.aiEnabled && s.aiModel && !this.disposed) {
         const summaryEpoch = ++this.summaryEpoch; this.companion.setConversationInference(true);
         void this.engine!.summarize(s.aiModel, modelTurns).then(result => this.store.setSummary(conversation.id, cleanText(result.summary), result.topics.map(cleanText), generation))
           .catch(() => { /* Stored user-only topics remain available offline. */ })

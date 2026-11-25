@@ -8,6 +8,7 @@ import { LINES, type Line, type Situation } from './lines';
 export type { Situation } from './lines';
 
 export interface DialogueContext {
+  overdue?: number; remaining?: number; reminder?: string; task?: string; deadline?: string;
   personality?: Settings['personality']; profanity?: boolean; speechScale?: number;
   mood?: Mood; emotions?: string[]; memoryEnabled?: boolean; name?: string; memoryFact?: string;
   talkativeness?: Settings['talkativeness']; app?: string; minutes?: number; hours?: number;
@@ -17,6 +18,17 @@ export interface DirectedSpeech { text: string; then?: string; priority: Priorit
 type Policy = readonly [chance: number, cooldownSeconds: number, priority: Priority, emotion: EmotionId, animation: AnimationId];
 /** All speech probabilities and per-situation cooldowns live here. */
 export const POLICIES: Record<Situation, Policy> = {
+  briefing_morning: [.95, 3600, 'low', 'happy', 'idle'],
+  summary_evening: [.9, 3600, 'low', 'happy', 'idle'],
+  deadline_nudge: [.85, 1800, 'low', 'curious', 'idle'],
+  overdue_nudge: [.7, 3600, 'low', 'curious', 'idle'],
+  assist_offer_design: [.7, 10800, 'low', 'curious', 'idle'],
+  assist_offer_writing: [.7, 10800, 'low', 'curious', 'idle'],
+  assist_offer_code: [.7, 10800, 'low', 'curious', 'idle'],
+  gaming_back: [.3, 3600, 'low', 'curious', 'idle'],
+  dnd_on: [1, 60, 'low', 'neutral', 'idle'],
+  privacy_on: [1, 60, 'low', 'neutral', 'idle'],
+  thought_tasks: [.2, 7200, 'low', 'curious', 'idle'],
   activity_yawn: [.2, 600, 'low', 'sleepy', 'yawn'],
   activity_stretch: [.2, 600, 'low', 'neutral', 'stretch'],
   activity_dance: [.35, 600, 'low', 'happy', 'dance'],
@@ -89,6 +101,8 @@ export function timeAway(ms: number): string {
 }
 export function fillTemplate(text: string, context: DialogueContext, now: number): string {
   const slots: Record<string, string> = {
+    overdue: String(context.overdue ?? 0), remaining: String(context.remaining ?? 0), reminder: context.reminder ?? 'none today',
+    task: context.task ?? 'That task', deadline: context.deadline ?? 'soon',
     app: context.app ?? 'that app', minutes: String(context.minutes ?? 0), hours: String(context.hours ?? Math.floor((context.minutes ?? 0) / 60)),
     name: sanitizeName(context.name ?? 'friend'), count: String(context.count ?? 1), timeAway: timeAway(context.awayMs ?? 0),
     time: new Date(now).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
@@ -103,6 +117,7 @@ export class DialogueDirector {
   private bags = new Map<string, Line[]>();
   // Store authored templates only: never historical foreground app names.
   private recent: Line[] = [];
+  private rubberDuckUsed = false;
   private cooldowns = new Map<Situation, number>();
   private appAllowed = new Map<string, number>();
   constructor(private rng = Math.random, private clock = Date.now) {}
@@ -126,12 +141,12 @@ export class DialogueDirector {
       const key = [situation, preset.id, candidate].join(':');
       bag = this.bags.get(key) ?? [];
       if (!bag.length) {
-        const pool = (candidate === 'profane' ? profane! : candidate === 'preset' ? overlays! : LINES[situation]).filter(eligibleLine);
+        const pool = (candidate === 'profane' ? profane! : candidate === 'preset' ? overlays! : LINES[situation]).filter(line => eligibleLine(line) && !(this.rubberDuckUsed && /rubber-duck/.test(line.text)));
         bag = pool.map(line => ({ line, key: -Math.log(Math.max(Number.EPSILON, this.rng())) / (line.weight ?? 1) }))
           .sort((a, b) => a.key - b.key).map(entry => entry.line);
         this.bags.set(key, bag);
       }
-      index = bag.findIndex(line => !recentTexts.includes(line.text) && (!line.then || !recentTexts.includes(line.then)));
+      index = bag.findIndex(line => !(this.rubberDuckUsed && /rubber-duck/.test(line.text)) && !recentTexts.includes(line.text) && (!line.then || !recentTexts.includes(line.then)));
       if (index >= 0) break;
     }
     // Exhausted pools stay silent rather than repeating a recent beat.
@@ -140,6 +155,7 @@ export class DialogueDirector {
     const speech: DirectedSpeech = { text: fillTemplate(line.text, context, now), then: line.then ? fillTemplate(line.then, context, now) : undefined, priority, emotion: context.mood === 'grumpy' && emotion === 'neutral' ? 'suspicious' : emotion,
       animation: situation === 'thought' ? (['idle', 'look_left', 'look_right'] as const)[Math.floor(this.rng() * 3)] : animation };
     if (!accept(speech)) return null;
+    if (/rubber-duck/.test(line.text)) this.rubberDuckUsed = true;
     bag.splice(index, 1); this.recent = [...this.recent, line].slice(-12);
     this.cooldowns.set(situation, now + cooldown * 1000);
     // Category-shared gates also enforce ten minutes per app, without app histories.

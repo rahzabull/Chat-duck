@@ -17,7 +17,8 @@ const pick = (a: Record<string, unknown>, keys: string[]) => Object.fromEntries(
 export interface ProductivityHooks {
   changed(view: ProductivityView): void;
   attention(kind: 'alarm' | 'celebrate' | 'focus', text?: string): void;
-  notify(reminder: Reminder, click: () => void): void;
+  notify(reminder: Reminder, click: () => void): boolean | void;
+  notificationOnly?(): boolean;
   export(kind: 'tasks' | 'reminders' | 'notes', data: unknown[], format: 'json' | 'txt'): Promise<boolean>;
   doNotDisturb(): boolean;
   copy?(text: string): void;
@@ -211,12 +212,25 @@ export class ProductivityService {
       const queued = this.queue.find(q => q.id === delivery.reminder.id);
       if (queued) queued.missed = delivery.missed; else this.queue.push({ id: delivery.reminder.id, missed: delivery.missed });
     }
-    if (!this.hooks.doNotDisturb() && this.queue.length && (this.card !== 'reminder-due' || result.deliveries.some(d => d.reminder.id === this.selected))) this.showDue();
+    if (this.hooks.notificationOnly?.()) {
+      for (const item of [...this.queue]) {
+        const r = this.store.reminders.value.find(r => r.id === item.id); if (!r) continue;
+        const key = `${r.id}:${r.lastFiredAt}`;
+        if (!this.notified.has(key)) {
+          try { if (this.hooks.notify(r, () => this.open('reminder-due', r.id)) === false) continue; }
+          catch { continue; }
+          this.notified.add(key); this.presented.add(key);
+        }
+        this.queue = this.queue.filter(q => q.id !== r.id);
+      }
+      if (changed) this.publish();
+    }
+    else if (!this.hooks.doNotDisturb() && this.queue.length && (this.card !== 'reminder-due' || result.deliveries.some(d => d.reminder.id === this.selected))) this.showDue();
     else if (changed) this.publish();
     if (this.focus && !this.focus.paused && this.focus.endAt <= Date.now()) { clearTimeout(this.focusTimer); return this.finishFocus(); }
   }).catch(() => { this.message = 'Could not save reminder delivery. Will retry on the next check.'; this.publish(); }); }
   private showDue(): void {
-    const next = this.queue[0]; if (!next || this.hooks.doNotDisturb()) return;
+    const next = this.queue[0]; if (!next || this.hooks.doNotDisturb() || this.hooks.notificationOnly?.()) return;
     const r = this.store.reminders.value.find(r => r.id === next.id); if (!r) return;
     this.message = next.missed ? `You missed this while I was asleep: ${r.text}` : 'reminder_due';
     this.card = 'reminder-due'; this.selected = r.id;

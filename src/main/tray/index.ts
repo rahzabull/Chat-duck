@@ -1,5 +1,6 @@
+import { SKILL_PACK_IDS, SKILL_PACKS } from '../../core/skills';
 import { Menu, nativeImage, Tray } from 'electron';
-import type { Command, CompanionState } from '../../shared/types';
+import type { Command, CompanionState, EditableSettings } from '../../shared/types';
 
 function duckIcon(): Electron.NativeImage {
   const size = 32; const bitmap = Buffer.alloc(size * size * 4);
@@ -19,7 +20,7 @@ function duckIcon(): Electron.NativeImage {
 }
 export class DuckyTray {
   private tray = new Tray(duckIcon());
-  constructor(private state: () => CompanionState, private command: (command: Command) => void) {
+  constructor(private state: () => CompanionState, private command: (command: Command) => void, private settings: (patch: Partial<EditableSettings>) => void = () => {}) {
     this.tray.setToolTip('Ducky — Made by Ente');
     this.tray.on('click', () => command(state().visible ? 'hide' : 'show'));
     this.refresh();
@@ -27,6 +28,15 @@ export class DuckyTray {
   menu(): Menu {
     const state = this.state();
     return Menu.buildFromTemplate([
+      { label: `Mode: ${state.mode?.replaceAll('_', ' ') ?? 'companion'}`, enabled: false },
+      { label: state.dnd ? 'Do not disturb - on' : 'Do not disturb', submenu: [
+        { label: '30 minutes', click: () => this.command('dnd-30') },
+        { label: '1 hour', click: () => this.command('dnd-60') },
+        { label: 'Until I turn it off', click: () => this.command('dnd-until-off') },
+        { label: 'Turn off', enabled: state.dnd, click: () => this.command('dnd-off') },
+      ] },
+      { label: 'Privacy mode', type: 'checkbox', checked: state.settings.privacyMode, click: () => this.command('privacy') },
+      { label: 'Skill pack', submenu: SKILL_PACK_IDS.map(id => ({ label: SKILL_PACKS[id].label, type: 'radio' as const, checked: state.settings.skillPack === id, click: () => this.settings({ skillPack: id }) })) },
       { label: 'Talk to Ducky', click: () => this.command('talk') },
       { label: 'Tasks', click: () => this.command('tasks') },
       { label: 'Add task…', click: () => this.command('add-task') },

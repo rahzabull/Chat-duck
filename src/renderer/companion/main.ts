@@ -1,3 +1,4 @@
+import { ProactiveUI } from './proactive';
 import { ConversationUI } from './conversation';
 import { ProductivityUI } from './productivity';
 import { guardedReply } from '../../core/conversation/output';
@@ -13,6 +14,7 @@ const adapter: CharacterSurface = window.ducky.placeholderDuck ? new Placeholder
 const api = window.ducky;
 const conversation = new ConversationUI(host, bubble, adapter);
 const productivity = new ProductivityUI(host);
+const proactive = new ProactiveUI();
 const reducedPreference = matchMedia('(prefers-reduced-motion: reduce)');
 let state: CompanionState | undefined;
 let captured: number | undefined;
@@ -27,7 +29,7 @@ function reportHit(x: number, y: number, force = false): void {
   const duck = adapter.hitTest(x, y);
   const element = document.elementFromPoint(x, y);
   const onBubble = !bubble.hidden && !!element && bubble.contains(element);
-  const hit = captured !== undefined || duck || onBubble || conversation.hit(element) || productivity.hit(element);
+  const hit = captured !== undefined || duck || onBubble || conversation.hit(element) || productivity.hit(element) || proactive.hit(element);
   if (force || hit !== interactive) { interactive = hit; api.hitTest(hit); }
   if (hovering !== duck) { hovering = duck; api.hover(duck); }
 }
@@ -37,17 +39,19 @@ function render(next: CompanionState): void {
   state = next;
   adapter.setReducedMotion(next.settings.reducedMotion || reducedPreference.matches);
   document.body.classList.toggle('reduced', next.settings.reducedMotion || reducedPreference.matches);
-  adapter.setVisible(next.visible); adapter.setPaused(next.paused && !next.conversation?.active);
+  adapter.setVisible(next.visible && !(next.gaming && next.settings.gamingBehaviour === 'hide')); adapter.setPaused(!!next.gaming || next.paused && !next.conversation?.active);
+  document.body.classList.toggle('gaming', !!next.gaming);
   adapter.setSleeping(next.sleeping && !next.paused); adapter.setDragging(next.dragging);
   adapter.setEmotion(next.emotion); adapter.setDirection(next.direction);
   adapter.setMovementSpeed(next.movementSpeed); adapter.setDebugHitbox(next.debugHitbox);
   if (!previous || previous.animationRevision !== next.animationRevision) adapter.play(next.animation);
   const conversing = conversation.render(next);
-  productivity.render(next);
+  productivity.render(next); proactive.render(next);
   if (!conversing) adapter.setTalking(!!next.bubble); adapter.setSunglasses(next.sunglasses);
   if (!conversing) bubble.textContent = guardedReply(next.bubble ?? '');
   if (!conversing) bubble.hidden = !next.bubble; bubble.classList.toggle('debug', next.debugHitbox);
-  if (next.productivitySpeech) { bubble.textContent = next.productivitySpeech; bubble.hidden = false; }
+  if (next.dnd || next.gaming) bubble.hidden = true;
+  if (next.productivitySpeech && !next.gaming && (!next.dnd || next.settings.dndReminders === 'bubble')) { bubble.textContent = next.productivitySpeech; bubble.hidden = false; }
   if (lastCursor) adapter.setEyeTarget(lastCursor.cursor.x - lastCursor.origin.x, lastCursor.cursor.y - lastCursor.origin.y);
   if (((wasDragging && !next.dragging) || !next.visible || next.paused) && captured !== undefined) releaseCapture();
   reportHit(lastPointer.x, lastPointer.y, wasDragging !== next.dragging);
@@ -67,7 +71,7 @@ document.addEventListener('mousemove', event => reportHit(event.clientX, event.c
 document.addEventListener('mouseleave', () => { if (captured === undefined) reportHit(-1, -1); });
 host.addEventListener('pointerdown', event => {
   if (event.button === 0 && adapter.hitTest(event.clientX, event.clientY) && conversation.clickToType()) { event.preventDefault(); return; }
-  if (event.button !== 0 || captured !== undefined || state?.paused || !adapter.hitTest(event.clientX, event.clientY)) return;
+  if (event.button !== 0 || captured !== undefined || state?.paused || state?.gaming || state?.dnd || !adapter.hitTest(event.clientX, event.clientY)) return;
   event.preventDefault(); captured = event.pointerId;
   host.setPointerCapture(event.pointerId); api.hitTest(true); interactive = true;
   void api.dragStart({ x: event.clientX, y: event.clientY }).catch(error => { console.error('Ducky drag start failed', error); releaseCapture(); });

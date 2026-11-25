@@ -1,4 +1,4 @@
-# Ducky architecture (Milestones 1–3 and Expansion Phases A–B)
+# Ducky architecture (Milestones 1–3 and Expansion Phases A–C)
 
 ## Expansion Phase B: productivity
 
@@ -36,8 +36,9 @@ presentation leaves an outstanding due card recoverable on startup; it does not
 repeat the alarm/OS notification. Done/Dismiss acknowledge the occurrence;
 recurring reminders remain scheduled. Cancel deletes the reminder after
 confirmation. A single queue and one card expose a waiting count. New deliveries
-bypass ordinary speech mute/talkativeness; the injectable doNotDisturb hook holds
-presentation for a future DND feature. Notification clicks open the relevant card.
+bypass ordinary speech mute/talkativeness. Phase C wires the DND/gaming hooks to
+notification-only delivery or the chosen reminder exception. Notification clicks
+open the relevant card.
 There is **no OS-level scheduling**: reminders only fire while Ducky is running.
 
 The Phase A registry exposes task/reminder/note/focus tools; its live names now
@@ -420,3 +421,78 @@ Native CPU/memory costs, including geometry-only mode, await Claude's measuremen
 Development-only `electron . --debug-activity <id>` waits for a safe geometry
 sample, then forces one allowlisted activity. Packaged builds ignore the flag;
 there is no debug IPC endpoint. See animation-contract.md for IDs and durations.
+
+
+## Expansion Phase C: modes, proactive flow and skill packs
+
+`src/core/modes` owns one priority resolver:
+`privacy > do_not_disturb > gaming > focus > conversation > companion`.
+The displayed mode does not discard underlying flags: privacy plus DND still
+blocks all AI and speech. DND is stored as 0 (off), -1 (indefinite), or an epoch
+expiry; the existing behaviour tick expires it, even when manually hidden/paused.
+Focus is the existing focus session (including paused focus); breaks retain the
+existing quiet surface behaviour. The companion publishes mode, DND and gaming
+state for tray, Settings, badges and both animation adapters.
+
+Fullscreen samples use the existing geometry helper. A stateful hysteresis gate
+requires 10 continuous seconds to enter and 5 seconds to leave; the existing
+three-second samples/two-second tick quantize those transitions. App identity
+collection is disabled during privacy, DND and gaming; geometry remains available
+while gaming, including when the native window is automatically hidden. A native
+hide event caused by gaming does not change the user's visibility preference.
+The cursor/motion loops and renderer animations pause during gaming; the renderer
+focus countdown stops until return. Only lightweight mode checks remain on the
+behaviour tick; proactive evaluation/activities return early during gaming.
+No new polling interval was introduced.
+
+Flow on the existing slow behaviour tick:
+
+1. Resolve mode and expire DND; reject blocked/hidden/paused/idle states.
+2. `ProactiveScheduler` derives candidates from local tasks/reminders and permitted
+   current app duration. Use local calendar dates; date-only tasks become overdue
+   after their local day ends. Completed tasks are excluded from deadline/overdue work.
+3. Respect feature settings, quiet hours, pack eligibility, candidate chance,
+   once-per-day/per-deadline delivery markers, per-app backoff and attempt cooldown.
+4. Ask `DialogueDirector` for the authored line with personality, mood and
+   talkativeness. Its chance, per-situation cooldown and recent-line exclusion
+   still apply. The rubber-duck offer can be used only once per application run.
+5. Pass through `SpeechQueue`. Only accepted speech creates an action card and
+   consumes a delivery marker. Rejected candidates back off for ten minutes;
+   gaming comeback gets one chance within one minute, with no queued late return.
+6. The user may dismiss, open Today/Overdue, or open a pack-aware planning/assistance
+   draft. Opening never submits the draft or runs a tool automatically.
+
+Morning and evening delivery markers, overdue markers and per-task/per-due-date
+markers persist in bounded `settings.proactiveHistory` (up to 512 entries), containing
+IDs/timestamps only. Assistance backoff keeps app names in memory only, clears on
+privacy/awareness revocation and resets on restart. Most new candidates have an
+independent scheduler chance as well as the director chance. Silence is intentional.
+The briefing includes real due-today, overdue and first future reminder facts;
+evening counts use `doneAt` and remaining open tasks. Factual proactive summaries
+currently stay hand-written even with AI on; there is no need to infer numbers.
+Rare task-related independent thoughts use the existing hybrid route, with an
+allowlisted real count. Ambient context also supports overdue/remaining/reminder
+facts, and the existing validator rejects unsupplied digits and mismatched times.
+
+Reminders retain the existing durable 15-second scheduler. Gaming/raw fullscreen
+and DND's notification-only option route due deliveries directly to the OS (even
+if ordinary-mode OS notifications are off), without waking/unhiding Ducky. Accepted
+notifications consume the presentation queue so there is no burst on leaving the
+mode. The reminder remains due and inspectable in Reminders. Native notification
+submission failures stay queued for retry or later normal presentation. The other
+DND option permits reminder bubble/card only, with a calm body; all other speech,
+celebrations and AI are blocked. Active conversation inference and summary requests
+are cancelled on entry; retention preferences still govern saving user conversations.
+Windows itself controls whether an accepted OS notification is visibly shown.
+
+`src/core/skills` defines the five skill packs: prompt section, assistance categories,
+hand-written fallback/opening lines and descriptions. `conversationPrompt` combines
+pack and personality as independent sections. Settings and tray share these
+identifiers. App names/observations are never passed into conversation prompts.
+
+Development-only `--debug-proactive <id>` accepts the scheduler's allowlisted IDs.
+Morning/evening previews bypass their time/day guard; other previews still need
+real eligible tasks or app dwell/comeback context. Debug bypasses the scheduler
+roll and boosts the director chance, never mode/quiet/interruption or director
+cooldown checks. Packaged builds ignore the flag. No fabricated task data or
+additional transport is used.

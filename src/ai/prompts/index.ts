@@ -6,7 +6,7 @@ import { eligibleLine, fillTemplate, type DialogueContext, type Situation } from
 import { LINES } from '../../core/dialogue/lines';
 import type { AIRequest } from '../providers';
 
-export interface AIContext { personality?: PresetId; profanity?: boolean; mood?: Mood; emotions?: string[]; name?: string; memoryFact?: string; event: Situation; localTime: string; app?: string; count?: number; minutes?: number; hours?: number }
+export interface AIContext { overdue?: number; remaining?: number; reminder?: string; personality?: PresetId; profanity?: boolean; mood?: Mood; emotions?: string[]; name?: string; memoryFact?: string; event: Situation; localTime: string; app?: string; count?: number; minutes?: number; hours?: number }
 export function sanitizeAppName(app: string): string | undefined {
   return app.replace(/[^A-Za-z0-9 .+-]/g, '').trim().slice(0, 40) || undefined;
 }
@@ -22,9 +22,10 @@ export function buildContext(event: Situation, input: DialogueContext, now = Dat
     if (input.memoryFact) context.memoryFact = input.memoryFact.replace(/[^A-Za-z0-9 .,:'-]/g, '').slice(0, 100);
   }
   if (input.app) context.app = sanitizeAppName(input.app);
-  for (const key of ['count', 'minutes', 'hours'] as const) {
+  for (const key of ['count', 'minutes', 'hours', 'overdue', 'remaining'] as const) {
     const value = input[key]; if (typeof value === 'number' && Number.isFinite(value) && value >= 0) context[key] = Math.floor(value);
   }
+  if (input.reminder && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(input.reminder)) context.reminder = input.reminder;
   if (context.minutes === undefined && input.awayMs !== undefined && Number.isFinite(input.awayMs)) context.minutes = Math.max(0, Math.round(input.awayMs / 60000));
   return context;
 }

@@ -36,6 +36,7 @@ export class AppSessionTracker {
   private threshold = 0;
   private switches: number[] = [];
   constructor(private clock = Date.now) {}
+  get minutes(): number { return this.current ? Math.max(0, Math.floor((this.clock() - this.started) / 60000)) : 0; }
   clear(): void { this.current = null; this.fullscreen = false; this.started = 0; this.threshold = 0; this.switches = []; }
   observe(sample: ForegroundSample): SituationEvent[] {
     const now = this.clock(); this.fullscreen = sample.fullscreen;

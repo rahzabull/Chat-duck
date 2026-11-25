@@ -1,9 +1,13 @@
-export type Intent = { kind: 'remember'; text: string } | { kind: 'forget'; query: string } |
+export type Intent = { kind: 'dnd'; minutes?: number; enabled: boolean } | { kind: 'privacy'; enabled: boolean } | { kind: 'remember'; text: string } | { kind: 'forget'; query: string } |
   { kind: 'memories' } | { kind: 'conversations'; when: 'yesterday' | 'last time' | 'earlier' } |
   { kind: 'mute'; minutes: number } | { kind: 'end' } | { kind: 'chat' };
 export function parseIntent(input: string): Intent {
   const text = input.trim().replace(/[.!?]+$/, '').replace(/\u2019/g, "'");
   const polite = text.replace(/^please\s+/i, '');
+  if (/^(?:turn (?:on|off) )?privacy mode$/i.test(polite)) return { kind: 'privacy', enabled: !/^turn off/i.test(polite) };
+  if (/^(?:turn off (?:do not disturb|dnd)|disturb me again)$/i.test(polite)) return { kind: 'dnd', enabled: false };
+  const dnd = /^(?:don't disturb me|do not disturb(?: me)?|dnd)(?: for (?:(\d+) (minutes?|hours?)|an? hour))?$/i.exec(polite);
+  if (dnd) return { kind: 'dnd', enabled: true, minutes: dnd[1] ? Math.min(1440, Math.max(1, +dnd[1] * (/hour/i.test(dnd[2]) ? 60 : 1))) : /hour/i.test(polite) ? 60 : undefined };
   if (/^remember (?:this|that):?$/i.test(polite)) return { kind: 'remember', text: '' };
   const save = /^remember\s+(?:(?:that\s+)|(?:this\s*:\s*))?(.+)$/is.exec(polite);
   if (save && !/^(?:this|that)$/i.test(save[1].trim())) return { kind: 'remember', text: save[1].trim() };

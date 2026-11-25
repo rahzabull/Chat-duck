@@ -43,6 +43,7 @@ export class ProductivityUI {
   }
   render(state: CompanionState): void {
     const view = state.productivity; this.view = view; if (!view) return;
+    if (state.gaming || !state.visible) { clearInterval(this.countdown); this.countdown = undefined; this.badge.hidden = true; this.card.hidden = true; this.revision = -1; return; }
     this.toast.textContent = state.productivitySpeech ?? ''; this.toast.hidden = !state.productivitySpeech;
     const active = !!view.card || !!view.focus || !!view.breakMinutes;
     if (active && view.layout) {

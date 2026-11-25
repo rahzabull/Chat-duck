@@ -233,3 +233,47 @@ the original app retained focus. Screenshots or screen recordings should capture
 the debug hitbox when investigating hit-testing. Keep personal desktop content
 out of shared evidence. Do not mark an OS feature verified solely because its
 core unit test passed.
+
+
+## Phase C desktop verification (pending)
+
+Automated fake-clock coverage exercises every candidate's once/cooldown/silence,
+mode and quiet-hours gates; calendar/count facts; permission/pack/dwell eligibility;
+per-app decline; persisted daily/deadline markers; fullscreen hysteresis; native
+hide-event simulation; DND expiry while hidden; ambient/conversation cancellation;
+notification-only delivery/retry; prompt composition; tray/Settings and renderer
+controls. It does not measure real desktop CPU or certify native Windows behaviour.
+
+1. Build, launch with AI off; toggle DND 30 min / 1 h / indefinite / off in tray and
+   Settings. Verify moon badge and mode label. Type "don't disturb me for an hour".
+   Click/hover, focus completion and task completion must not produce speech in DND.
+2. Schedule a reminder while in DND. Test both notification-only (no unhide, no
+   animations) and bubble/card (calm body) settings. Reminders should remain available
+   in the Reminders card; leaving notification-only must not replay them.
+3. Enable app awareness, then Privacy mode. Verify sunglasses, inactive awareness,
+   no contextual bubbles, no continuing ambient Ollama call. The geometry-only helper
+   should have no process-name query in its generated script. Toggle privacy with DND
+   also active and confirm all DND restrictions remain.
+4. Launch unpackaged with `--debug-proactive briefing_morning`. Move the mouse, close
+   open cards/conversation, leave mute/DND/quiet hours off. Verify actual task/overdue
+   counts and first reminder time. Tap Today and dismiss. Packaged launch must ignore
+   the flag. Other accepted IDs: summary_evening, deadline_nudge, overdue_nudge,
+   assist_offer_design, assist_offer_writing, assist_offer_code, gaming_back; their
+   real-data eligibility is retained except the daily time guards for summaries.
+5. Add a task due in two hours; close its confirmation card. A normal chance roll
+   may decline and back off ten minutes. For a deterministic chance preview use
+   `--debug-proactive deadline_nudge` with that real task. Plan it should open a draft
+   without auto-sending; Later should dismiss. Check date-only tomorrow and overdue.
+6. Open fullscreen video for at least 10 seconds. Verify hide then freeze settings,
+   no animation/cursor loops or AI, and OS reminder delivery. Leave fullscreen for
+   at least 5 seconds (plus sampling/tick latency). Check Ducky returns without focus
+   theft, but a manual Hide made during gaming is preserved. Short fullscreen flickers
+   must not cause repeated hide/show. Comeback lines are deliberately rare.
+7. Switch all five skill packs in tray and Settings. With local AI on, ask the same
+   question and compare useful style; personality remains independently selected.
+   With AI off, verify pack-aware hand-written prompts plus local productivity commands.
+8. With awareness enabled, dwell 45 minutes in a supported design/writing/code app.
+   Check matching pack offers, No's three-hour backoff, privacy and quiet-hour suppression.
+9. Re-measure idle CPU/RAM with AI off in companion, privacy, DND, gaming hide and
+   gaming freeze, using the existing performance procedure. Compare against the
+   committed Phase B/Figma baseline. No measured performance result is claimed here.

@@ -314,3 +314,39 @@ daily mood and two emotion words. Disabling/forgetting aborts pending requests
 and clears Ducky's RAM dialogue context and diagnostic sample. Ducky does not
 control Ollama's own logging. Memories never reduce happiness for absence or
 create guilt for leaving.
+
+
+## Privacy mode - Expansion Phase C
+
+Enable Privacy mode in the tray, Settings, or by typing "privacy mode" to Ducky.
+A sunglasses badge/accessory indicates it. Disabling via tray/Settings or "turn off
+privacy mode" restores the existing app-awareness preference; it does not silently
+enable a preference that was off.
+
+Enabling privacy immediately cancels ambient inference, clears the current app
+session/dwell/switch context, clears temporary ambient AI dialogue history and
+sample output, dismisses contextual bubbles/offers, and erases the in-memory app
+assistance backoff map. The helper restarts in **geometry-only** mode: its generated
+code excludes process image-name lookup. It may still read foreground window
+geometry and opaque handles to detect fullscreen and restore conversation focus.
+It does not read titles, content, screenshots, URLs or app identity in this mode.
+A sample arriving at the permission boundary is stripped of identity in main too.
+No contextual app comments/offers or ambient AI calls occur while privacy is on.
+
+The conversation engine never receives desktop observations, including in normal
+mode. Privacy cancels its current request and clears its in-memory model turns;
+explicit new questions may still use the configured local Ollama. Approved memories,
+conversation archives, tasks, reminders and notes are retained under their existing
+settings, not silently erased by a privacy toggle. Daily/task summaries are allowed
+in privacy because they use user-created local productivity data, not observation.
+DND or gaming layered under privacy still disables **all** AI and speech apart from
+the selected reminder route.
+
+Skill packs are local prompt/style settings, independent of personality. They grant
+no new permissions. Proactive action buttons only open local cards or a reviewable
+conversation draft; they never send a message or create tasks on their own. Persistent
+proactive delivery markers contain candidate/task IDs and timestamps, not task titles
+or app identities. App-specific assistance backoff is memory-only and resets on
+restart or privacy/awareness revocation. No new network endpoint or dependency was
+added. Windows notifications may expose reminder text to the local notification
+surface, as before; gaming and DND's OS-only option explicitly select this route.

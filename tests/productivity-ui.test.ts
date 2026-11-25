@@ -1,3 +1,5 @@
+import { ProactiveUI } from '../src/renderer/companion/proactive';
+import { DEFAULT_SETTINGS } from '../src/shared/schemas/settings';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProductivityUI, reminderLabel } from '../src/renderer/companion/productivity';
 import { FOCUS_DEFAULTS, type ProductivityView } from '../src/core/productivity/types';
@@ -29,7 +31,7 @@ function setup(card: ProductivityView['card']) {
   const api = vi.fn(async () => ({ ok: true, message: '' })); vi.stubGlobal('window', { ducky: { productivity: api } });
   const now = new Date().toISOString();
   const view: ProductivityView = { revision: 1, card, tasks: [{ id: 't', title: malicious, due: now.slice(0, 10), priority: 'normal', done: false, subtasks: [], createdAt: now, updatedAt: now }], reminders: [{ id: 'r', text: malicious, at: now, state: 'due', createdAt: now, timezone: 'UTC' }], notes: [{ id: 'n', text: malicious, title: malicious, pinned: false, createdAt: now, updatedAt: now }], settings: { ...FOCUS_DEFAULTS }, queue: 0, message: malicious, selected: card === 'notes' ? 'n' : card?.includes('reminder') ? 'r' : 't' };
-  const ui = new ProductivityUI(new Node() as unknown as HTMLElement); const state = { productivity: view } as CompanionState; ui.render(state); return { ui, api, view, state, listeners };
+  const ui = new ProductivityUI(new Node() as unknown as HTMLElement); const state = { visible: true, productivity: view } as CompanionState; ui.render(state); return { ui, api, view, state, listeners };
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe('temporary productivity cards', () => {
@@ -106,5 +108,31 @@ describe('temporary productivity cards', () => {
   it('labels a recurring due occurrence using its fired time, not tomorrow’s next occurrence', () => {
     const { ui, view } = setup('reminder-due'); const r = view.reminders[0]; const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); r.lastFiredAt = yesterday.toISOString(); const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); r.at = tomorrow.toISOString();
     expect(reminderLabel(r)).not.toContain('Tomorrow'); ui.dispose();
+  });
+});
+
+
+describe('Phase C companion affordances', () => {
+  it('shows accessible mode badges and safely renders actionable suggestions', () => {
+    const { state } = setup(null); state.settings = { ...DEFAULT_SETTINGS, privacyMode: true }; state.dnd = true;
+    const command = vi.fn(async () => {}); window.ducky.command = command;
+    const ui = new ProactiveUI(); ui.render(state);
+    const body = document.body as unknown as Node;
+    const badge = body.children.find(n => n.attrs.get('role') === 'status')!;
+    expect(badge.hidden).toBe(false); expect(badge.attrs.get('aria-label')).toContain('Privacy mode');
+    expect(badge.attrs.get('aria-label')).toContain('Do not disturb');
+    state.dnd = false; state.proactive = { label: 'Plan it', detail: malicious, dismissLabel: 'Later' }; state.bubble = 'A deadline'; ui.render(state);
+    const card = body.children.find(n => n.attrs.get('aria-label') === 'Ducky suggestion')!;
+    expect(card.hidden).toBe(false); expect(card.querySelector('p')?.textContent).toBe(malicious);
+    const buttons = card.querySelectorAll('button'); buttons[0].onclick!(); buttons[1].onclick!();
+    expect(command.mock.calls).toEqual([['proactive-accept'], ['proactive-later']]);
+    state.gaming = true; ui.render(state); expect(card.hidden).toBe(true); expect(badge.hidden).toBe(true);
+  });
+  it('stops focus countdown work during gaming and resumes from the clock on return', () => {
+    vi.useFakeTimers(); const { ui, view, state } = setup(null);
+    view.focus = { kind: 'focus', paused: false, endAt: Date.now() + 60000, remaining: 60000, startedAt: Date.now(), minutes: 1 }; view.revision++; ui.render(state);
+    expect(vi.getTimerCount()).toBe(1); state.gaming = true; ui.render(state); expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(10000); state.gaming = false; ui.render(state);
+    expect(vi.getTimerCount()).toBe(1); expect((ui.badge as unknown as Node).querySelector('span')?.textContent).toContain('00:50'); ui.dispose();
   });
 });

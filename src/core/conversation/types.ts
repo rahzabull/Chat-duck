@@ -13,6 +13,7 @@ export const cleanText = (text: string): string => text.replace(/[\u0000-\u0008\
 export interface ConversationView {
   active: boolean; state: import('../../animation/adapter').ConversationState | null;
   forceBubble?: boolean;
+  draft?: { text: string; revision: number };
   inputReady?: boolean; focusRequest?: number; focusFailed?: boolean;
   reply: string; revision: number; panel: boolean; shortcutError: string;
   layout?: { x: number; y: number; width: number; height: number; contentX: number; contentBottom: number; contentWidth: number; contentHeight: number };

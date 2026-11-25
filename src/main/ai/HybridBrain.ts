@@ -7,7 +7,7 @@ import { LINES } from '../../core/dialogue/lines';
 import type { BrainState, Settings } from '../../shared/types';
 
 export const usesAI = (situation: Situation): boolean => situation.startsWith('app_') || [
-  'thought', 'thought_morning', 'thought_late', 'wake_long', 'hover_linger', 'hover_again', 'drag_long',
+  'thought_tasks', 'thought', 'thought_morning', 'thought_late', 'wake_long', 'hover_linger', 'hover_again', 'drag_long',
   'late_night_working', 'sleepy_late', 'click_forgive',
 ].includes(situation);
 type Config = Pick<Settings, 'aiEnabled' | 'aiModel' | 'ollamaPort'> & Partial<Pick<Settings, 'personality' | 'profanity'>>;

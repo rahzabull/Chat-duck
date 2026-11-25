@@ -110,3 +110,24 @@ describe('AI-independent productivity orchestration', () => {
     await vi.advanceTimersByTimeAsync(1); expect(tick).toHaveBeenCalledTimes(2); expect(vi.getTimerCount()).toBe(1);
   });
 });
+
+
+describe('Phase C notification-only delivery', () => {
+  it('notifies once during gaming/DND even with normal OS notifications disabled, without a duck replay', async () => {
+    await action('settings', { notifications: false }); await local('remind me to drink in 1 minute'); await action('close');
+    hooks.doNotDisturb = () => true; hooks.notificationOnly = () => true;
+    vi.setSystemTime(Date.now() + 60000); await service.tick();
+    expect(hooks.notify).toHaveBeenCalledOnce(); expect(hooks.attention).not.toHaveBeenCalled(); expect(service.view.card).toBeNull();
+    await service.tick(); expect(hooks.notify).toHaveBeenCalledOnce();
+    hooks.doNotDisturb = () => false; hooks.notificationOnly = () => false; await service.tick();
+    expect(service.view.card).toBeNull(); expect(hooks.attention).not.toHaveBeenCalled();
+    expect(store.reminders.value[0].state).toBe('due');
+  });
+  it('retains delivery when the native notification fails so it can be retried', async () => {
+    await local('remind me to drink in 1 minute'); await action('close');
+    hooks.notificationOnly = () => true; hooks.notify = vi.fn(() => false);
+    vi.setSystemTime(Date.now() + 60000); await service.tick(); expect(service.view.card).toBeNull();
+    hooks.notificationOnly = () => false; await service.tick(); expect(service.view.card).toBe('reminder-due');
+    expect(hooks.attention).toHaveBeenCalledOnce();
+  });
+});

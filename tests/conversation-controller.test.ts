@@ -24,6 +24,8 @@ function setup(aiEnabled = false, productivity?: ProductivityService) {
   const call = (name: string) => vi.fn(() => { calls.push(name); });
   const window = Object.assign(new EventEmitter(), { calls, setFocusable: vi.fn((value: boolean) => { calls.push(`focusable:${value}`); }), focus: call('focus'), show: call('show'), hide: call('hide'), showInactive: call('showInactive'), setAlwaysOnTop: vi.fn((_value: boolean, _level: string) => { calls.push('topmost'); }), moveTop: call('moveTop'), webContents: { focus: call('contents.focus') }, isFocused: () => driver.focused });
   const companion = { state: { settings: { ...DEFAULT_SETTINGS, aiEnabled, aiModel: 'qwen3:8b' } } as CompanionState, window,
+    aiBlocked: vi.fn(() => companion.state.settings.dndUntil === -1 || companion.state.settings.dndUntil > Date.now() || !!companion.state.gaming),
+    updateSettings: vi.fn((patch: Partial<CompanionState['settings']>) => { Object.assign(companion.state.settings, patch); }),
     captureConversationFocus: vi.fn((ready: () => void) => ready()),
     releaseConversationFocus: vi.fn(() => { window.setFocusable(false); window.hide(); window.showInactive(); window.setAlwaysOnTop(companion.state.settings.alwaysOnTop && !companion.state.settings.desktopOnly, 'screen-saver'); }),
     setConversationInference: vi.fn(), beginConversation: vi.fn(), finishConversation: vi.fn(), muteFor: vi.fn(),
@@ -271,4 +273,39 @@ describe('conversation main controller', () => {
     resolve(JSON.stringify({ summary: 'We greeted each other.', topics: ['hello', 'greeting', 'conversation'] }));
     await vi.advanceTimersByTimeAsync(1); expect(companion.setConversationInference).toHaveBeenLastCalledWith(false);
   });
+});
+
+
+describe('Phase C conversation controls', () => {
+  it('handles DND and privacy locally with AI enabled', async () => {
+    const companion = setup(true); service.open(); await service.send('privacy mode');
+    expect(companion.state.settings.privacyMode).toBe(true); expect(driver.generate).not.toHaveBeenCalled();
+    await service.send("don't disturb me for an hour");
+    expect(companion.state.settings.dndUntil).toBe(Date.now() + 3600000); expect(companion.state.conversation?.reply).toBe('');
+    expect(companion.state.conversation?.active).toBe(false); expect(driver.generate).not.toHaveBeenCalled();
+  });
+  it('cancels conversation inference on a restrictive mode and does not summarize', async () => {
+    const companion = setup(true); service.open(); let finish!: (value: string) => void;
+    driver.generate.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const pending = service.send('Explain bread'); await Promise.resolve();
+    companion.state.gaming = true; service.modeChanged();
+    finish(JSON.stringify({ reply: 'Late answer', tone: 'neutral', tool: null })); await pending;
+    expect(companion.state.conversation?.active).toBe(false); expect(companion.state.conversation?.reply).toBe('');
+    expect(driver.generate).toHaveBeenCalledOnce(); service.open(); expect(companion.state.conversation?.active).toBe(false);
+  });
+  it('opens an assistance/planning prompt for review without automatically sending it', () => {
+    const companion = setup(); service.openWithPrompt('Help me plan the presentation.');
+    expect(companion.state.conversation?.draft?.text).toBe('Help me plan the presentation.');
+    expect(companion.state.conversation?.inputReady).toBe(true); expect(driver.generate).not.toHaveBeenCalled();
+  });
+});
+
+
+it('gives each reviewed planning draft a fresh revision and clears submitted/closed drafts', async () => {
+  const companion = setup(); service.openWithPrompt('Help with design.');
+  const first = companion.state.conversation!.draft!.revision;
+  await service.send('hello'); expect(companion.state.conversation?.draft).toBeUndefined();
+  service.end(); service.openWithPrompt('Help with code.');
+  expect(companion.state.conversation?.draft).toEqual({ text: 'Help with code.', revision: first + 1 });
+  service.end(); expect(companion.state.conversation?.draft).toBeUndefined();
 });

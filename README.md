@@ -1,5 +1,49 @@
 # Ducky.exe
 
+## Proactive intelligence, modes and skill packs - Expansion Phase C
+
+Ducky can offer a morning agenda, deadline help, an overdue review and optional
+evening summary. These use your real local tasks and reminders, work with AI off,
+and can stay silent. **Today** opens the task card; **Plan it / Yes** opens a draft
+prompt near Ducky for you to review and send. **No** backs off assistance for that
+app for three hours. Settings > Proactive help controls each feature.
+
+- **Do not disturb:** tray submenu (30 minutes, 1 hour, until turned off), Settings,
+  or say "don't disturb me for an hour". A moon badge marks silence. Only reminders
+  may interrupt; choose Windows notification only (default) or reminder bubble/card.
+  No AI runs during DND. Turn it off in the tray or Settings to talk again.
+- **Privacy mode:** tray or Settings toggle, or say "privacy mode". Sunglasses mark
+  the mode. App observation and related temporary AI context stop immediately.
+  Geometry-only fullscreen detection continues. Explicit conversation can still
+  use local AI, with no app context.
+- **Gaming:** sustained fullscreen enters gaming after at least 10 seconds. Choose
+  hide or freeze; animations and AI stop. Reminders use Windows notifications.
+  Ducky returns after at least 5 seconds out of fullscreen, occasionally with a line.
+- **Quiet hours:** optional, default window 23:00-08:00. These silence proactive
+  speech. Focus also quiets proactive help. Mute silences proactive speech at any time.
+- **Skill packs:** Companion, Creative, Developer, Productivity and Student, in tray
+  and Settings. They change help style and assistance offers independently of the
+  personality selector. Full explanations still require optional local AI.
+
+Morning briefing defaults to on, within 05:00-12:00; evening summaries default to
+off and run after 18:00. Deadlines mean tomorrow or within three hours. Chance,
+cooldowns and interruption gates apply; a due task does not guarantee immediate speech.
+Fullscreen detection uses the existing three-second geometry samples; mode updates
+use the existing two-second behaviour tick. No new dependencies or network paths.
+
+Development-only manual preview after a local build:
+
+```powershell
+.\node_modules\.bin\electron.cmd . --debug-proactive briefing_morning
+```
+
+The flag is ignored in packaged builds. It forces the morning time/day/chance
+eligibility with real data, but still respects mute, modes, quiet hours, idle state,
+open cards/conversation, the director's cooldown and the interruption queue. Close
+any card and move the mouse to be active. See [testing](docs/testing.md) for the
+full desktop checklist. Phase C desktop verification and idle CPU measurements
+are pending; automated checks do not substitute for them.
+
 ## Productivity — Expansion Phase B
 
 Tasks, reminders, notes and focus work with **AI off**. Use temporary cards near

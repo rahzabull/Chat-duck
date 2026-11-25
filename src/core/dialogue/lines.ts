@@ -20,6 +20,7 @@ export interface Line {
 }
 
 export type Situation =
+  | 'briefing_morning' | 'summary_evening' | 'deadline_nudge' | 'overdue_nudge' | 'assist_offer_design' | 'assist_offer_writing' | 'assist_offer_code' | 'gaming_back' | 'dnd_on' | 'privacy_on' | 'thought_tasks'
   | 'activity_yawn'
   | 'activity_stretch'
   | 'activity_dance'
@@ -44,6 +45,73 @@ export type Situation =
   | 'app_switching' | 'app_generic_long' | 'late_night_working';
 
 export const LINES: Record<Situation, Line[]> = {
+  briefing_morning: [
+    { text: "Good morning. You've got {count} tasks today. I've got none. Life is beautiful." },
+    { text: "Morning. {count} tasks due today. I have brought moral support. It's mostly feathers." },
+    { text: "You've got {count} tasks today. Shall we start with the least annoying?" },
+    { text: "Morning report: {count} tasks today. My calendar remains offensively empty." },
+  ],
+  summary_evening: [
+    { text: "You finished {count} tasks today. {remaining} left. I supervised from down here." },
+    { text: "Today's tally: {count} done, {remaining} left. Paperwork with a plot." },
+    { text: "That's {count} tasks finished today. {remaining} remain. The list has been informed." },
+    { text: "Evening report: {count} done, {remaining} still waiting. I vote for a sensible stopping point." },
+  ],
+  deadline_nudge: [
+    { text: "{task} is due {deadline}. Shall we collectively panic or make a plan?" },
+    { text: "Small heads-up: {task} is due {deadline}. We could make the first step smaller." },
+    { text: "{task}: due {deadline}. Want a plan? Mine usually starts with sitting down." },
+    { text: "The calendar says {task} is due {deadline}. Bit rude. Want to break it down?" },
+  ],
+  overdue_nudge: [
+    { text: "You've got {count} overdue tasks. Want to renegotiate with the list?" },
+    { text: "{count} tasks are past due. We can pick a next step. No courtroom involved." },
+    { text: "The overdue pile is at {count}. Want to sort it out together?" },
+    { text: "{count} overdue tasks. A revised plan still counts as a plan." },
+  ],
+  assist_offer_design: [
+    { text: "Want a second opinion on the layout?" },
+    { text: "Want to brainstorm some alternatives? I can be selectively useful." },
+    { text: "Need help thinking through a design decision?" },
+    { text: "Want to talk through the layout? I have opinions and a hat." },
+  ],
+  assist_offer_writing: [
+    { text: "Need help writing copy for this?" },
+    { text: "Want a few different ways to say it?" },
+    { text: "Want to talk through the draft? I know several words." },
+    { text: "Need a hand with the wording? A wing, technically." },
+  ],
+  assist_offer_code: [
+    { text: "Want me to rubber-duck that bug with you?" },
+    { text: "Want to walk through the problem together?" },
+    { text: "Need another pair of eyes on an error? Paste it here." },
+    { text: "Want to explain what should happen and what actually happens?" },
+  ],
+  gaming_back: [
+    { text: "Did you win? Don't tell me. I'll preserve the mystery." },
+    { text: "Welcome back. I have maintained this patch of desktop." },
+    { text: "I kept quiet. An astonishing display of restraint." },
+    { text: "Back to the desktop. The scenery remains rectangular." },
+    { text: "I used the break to accomplish absolutely nothing." },
+  ],
+  dnd_on: [
+    { text: "Quiet time. I can do that." },
+    { text: "I'll keep my opinions folded away." },
+    { text: "Understood. Entering decorative duck mode." },
+    { text: "Silence it is. Finally, a job I'm qualified for." },
+  ],
+  privacy_on: [
+    { text: "Privacy mode. Your business remains your business." },
+    { text: "Sunglasses on. Minding my own business." },
+    { text: "I've stopped noticing apps. Very peaceful." },
+    { text: "No app watching. Just a duck in excellent eyewear." },
+  ],
+  thought_tasks: [
+    { text: "{count} unfinished tasks. My contribution remains mostly ornamental." },
+    { text: "You have {count} tasks waiting. I have a hat." },
+    { text: "The task list contains {count} items. None of them say feed duck." },
+    { text: "{count} pending tasks. I remain available for thoughtful nodding." },
+  ],
   first_launch: [
     { text: 'Hello. I live here now.', then: 'Don\'t mind me. I\'ll be down here, judging quietly.' },
   ],

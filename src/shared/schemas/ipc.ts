@@ -26,7 +26,7 @@ export function validatePayload(channel: string, value: unknown): boolean {
       return value.action === 'add' ? keys === 'action,category,text' : id && keys === 'action,category,id,text';
     }
     case CHANNELS.updateSettings: return isSettingsPatch(value);
-    case CHANNELS.command: return ['talk', 'tasks', 'add-task', 'add-reminder', 'focus', 'notes', 'show', 'hide', 'pause', 'mute', 'reset', 'settings', 'quit'].includes(value as string);
+    case CHANNELS.command: return ['privacy', 'dnd-off', 'dnd-30', 'dnd-60', 'dnd-until-off', 'proactive-accept', 'proactive-later', 'talk', 'tasks', 'add-task', 'add-reminder', 'focus', 'notes', 'show', 'hide', 'pause', 'mute', 'reset', 'settings', 'quit'].includes(value as string);
     case CHANNELS.hitTest:
     case CHANNELS.hover: return typeof value === 'boolean';
     case CHANNELS.dragStart: return isPoint(value);

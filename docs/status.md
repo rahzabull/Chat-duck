@@ -1,5 +1,34 @@
 # Ducky implementation status
 
+## Expansion Phase C (2026-11-25)
+
+| Area | Implementation | Verification |
+| --- | --- | --- |
+| Mode resolver | Privacy > DND > gaming > focus > conversation > companion; independent suppression flags | Priority, timed expiry and hysteresis fake-clock tests pass |
+| DND | Tray durations/off, Settings, local conversation intent, moon badge, calm body, no AI | Main/controller and UI routing tests pass; native desktop pending |
+| Privacy | One-click tray/Settings, local intent, sunglasses, identity helper stopped, app context/history cleared | Cancellation and permission-boundary tests pass; native desktop pending |
+| Gaming/fullscreen | 10-second entry, 5-second exit, hide/freeze, paused animation/cursor/motion, rare comeback | Transition and native-hide simulation tests pass; fullscreen desktop pending |
+| Reminders | Durable scheduler preserved; OS-only during gaming or selected DND route; no return burst | Notification/retry/exception tests pass; Windows delivery pending |
+| Proactive help | Morning agenda, optional evening summary, deadline/overdue nudges, 45-minute app offers, rare task thoughts | Every candidate tested with fake clocks for once/cooldown/mode/quiet/silence; real facts and persistence covered |
+| Skill packs | Five independent prompt/style/offer packs, hand-written fallback lines, Settings cards and tray | Pack x personality prompt matrix and controls tests pass; local-model comparison pending |
+| Debug preview | Unpackaged-only --debug-proactive allowlist; real data and interruption gates retained | Morning preview and packaged rejection tests pass |
+| Performance | Reuses existing 2-second behaviour / 3-second geometry / 15-second reminder cadence; gaming disables fast work | Timer/cancellation tests pass; fresh idle CPU measurement pending |
+
+Validation: `npm run typecheck` passed; `npm test` passed with **854 passed, 3
+skipped**, 35 passing files and 2 skipped files; `npm run build` passed, including
+Figma asset generation. The existing non-fatal Vite native-config warning remains.
+No commits, new dependencies, MCP access or network calls were used for this job.
+
+**Desktop verification remains pending.** Follow the Phase C checklist in
+[testing.md](testing.md): tray toggles/badges, forced real morning briefing, a task
+due in two hours, fullscreen hide/freeze/return, Windows notifications, pack answer
+comparison and idle CPU against the committed baseline. Tests simulate native
+window/helper events; they do not establish native performance or visual results.
+Factual proactive summaries currently remain hand-written even with AI enabled;
+rare task thoughts retain the optional hybrid route. App-specific offer backoff
+lasts for this process only; daily/deadline delivery markers persist locally.
+
+
 ## Rahul's Figma Ducky (2026-11-25)
 
 - Default character is now the parts-based Figma adapter. The old placeholder

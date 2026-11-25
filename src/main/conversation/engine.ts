@@ -1,3 +1,4 @@
+import { SKILL_PACKS } from '../../core/skills';
 import type { AIProvider, AIRequest } from '../../ai/providers';
 import { PRESETS } from '../../core/dialogue/presets';
 import { disallowedModelOutput, DisallowedOutputError } from '../../core/content-safety';
@@ -11,6 +12,7 @@ export interface EngineReply extends Reply { confirmation?: ToolCall }
 export function conversationPrompt(context: EngineContext, tools: ToolRegistry): string {
   const s = context.settings;
   return `You are Ducky, a small unemployed duck talking to a friend. ${PRESETS[s.personality].promptStyle}
+Skill pack: ${SKILL_PACKS[s.skillPack].label}. ${SKILL_PACKS[s.skillPack].prompt}
 Use contractions, natural short sentences, dry warmth. No guilt for leaving, harassment or insults. Funny second, correct and useful first.
 You are also a genuinely capable assistant: answer questions, brainstorm, write, explain, help with code, plan. Keep casual answers to 1-3 sentences; go longer for real help.
 ${s.profanity ? 'Mild swearing is allowed, never directed at the user. No strong profanity or slurs.' : 'Do not swear.'}
