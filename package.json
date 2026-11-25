@@ -1,0 +1,38 @@
+{
+  "name": "ducky-exe",
+  "version": "0.1.0",
+  "description": "Ducky.exe — a privacy-first desktop companion by Ente (prototype)",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "pack:win": "electron-vite build && electron-builder --win --dir"
+  },
+  "keywords": [],
+  "author": "Ente",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "26.6.7",
+    "@types/react": "19.3.1",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "electron": "45.5.0",
+    "electron-builder": "26.18.0",
+    "electron-vite": "6.0.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.1"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "allowScripts": {
+    "electron@45.5.0": true
+  },
+  "private": true
+}
