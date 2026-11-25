@@ -1,0 +1,41 @@
+export interface Point { x: number; y: number }
+export interface WorkArea extends Point { width: number; height: number; id: number }
+export type Direction = 'left' | 'right';
+export interface Settings {
+  alwaysOnTop: boolean;
+  desktopOnly: boolean;
+  characterSize: number;
+  launchAtStartup: boolean;
+  walking: boolean;
+  talkativeness: 'quiet' | 'normal' | 'chatty';
+  idleToSleepMinutes: number;
+  reducedMotion: boolean;
+  mute: boolean;
+  firstLaunchDone: boolean;
+  position: Point | null;
+}
+export type EditableSettings = Omit<Settings, 'firstLaunchDone' | 'position'>;
+export interface CompanionState {
+  visible: boolean; paused: boolean; sleeping: boolean; dragging: boolean;
+  animation: string; animationRevision: number; emotion: string; direction: Direction; movementSpeed: number;
+  bubble: string | null; settings: Settings; debugHitbox: boolean; version: string;
+}
+export interface CursorUpdate { cursor: Point; origin: Point }
+export type Command = 'show' | 'hide' | 'pause' | 'mute' | 'reset' | 'settings' | 'quit';
+export interface DuckyAPI {
+  getState(): Promise<CompanionState>;
+  updateSettings(patch: Partial<EditableSettings>): Promise<CompanionState>;
+  command(command: Command): Promise<void>;
+  hitTest(interactive: boolean): void;
+  hover(active: boolean): void;
+  dragStart(point: Point): Promise<void>;
+  dragEnd(): Promise<void>;
+  doubleClick(): void;
+  contextMenu(): void;
+  dismissBubble(): void;
+  animationComplete(animation: string): void;
+  onState(callback: (state: CompanionState) => void): () => void;
+  onCursor(callback: (update: CursorUpdate) => void): () => void;
+  onPosition(callback: (origin: Point) => void): () => void;
+}
+declare global { interface Window { ducky: DuckyAPI } }

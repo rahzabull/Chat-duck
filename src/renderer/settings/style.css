@@ -1,0 +1,19 @@
+:root { font-family: "Segoe UI", sans-serif; color: #233c31; background: #f6f7f0; color-scheme: light; font-size: 14px; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 600px; margin: auto; padding: 24px; }
+h1 { font-size: 24px; margin: 0 0 4px; }
+header p { color: #5b6e62; margin-top: 0; }
+h2 { font-size: 17px; margin: 0 0 15px; }
+section { border-top: 1px solid #d5dfd4; padding: 20px 0; }
+label { display: block; margin: 12px 0 6px; }
+.check { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+input[type="checkbox"] { width: 17px; height: 17px; margin: 0; accent-color: #276a47; }
+input[type="range"] { width: 100%; margin: 8px 0 16px; accent-color: #276a47; }
+input[type="number"], select { display: block; width: 100%; padding: 8px; border: 1px solid #8c9f90; border-radius: 5px; color: inherit; background: white; font: inherit; }
+button { border: 1px solid #8c9f90; border-radius: 7px; padding: 8px 12px; background: white; color: #234e36; font: inherit; cursor: pointer; }
+button:hover { background: #e5efdf; }
+:focus-visible { outline: 3px solid #4779ae; outline-offset: 3px; }
+.hint { color: #596b5e; font-size: 12px; line-height: 1.5; }
+.error { color: #8c2222; background: #fff1ee; padding: 10px; }
+footer { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 12px; }

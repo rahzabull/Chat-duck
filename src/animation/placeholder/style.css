@@ -1,0 +1,57 @@
+.duck { width: 100%; height: 100%; overflow: visible; pointer-events: none; --step-time: .55s; }
+.duck [data-duck-hit] { pointer-events: visiblePainted; cursor: grab; }
+.duck .eyes, .duck .hat, .duck .brows, .duck .closed-eyes { pointer-events: none; }
+.duck .hat [data-duck-hit] { pointer-events: visiblePainted; }
+.duck .direction { transform-origin: 160px 230px; }
+.duck[data-direction="left"] .direction { transform: scaleX(-1); }
+.duck .body-motion { transform-origin: 160px 290px; }
+.duck[data-breath="1"] .body-motion { transform: scale(1.006,1.012); }
+.duck[data-breath="2"] .body-motion { transform: scale(1.012,1.025); }
+.duck .closed-eyes, .duck .zzz { opacity: 0; }
+.duck .eyes { transform-origin: 160px 199px; }
+.duck .brows { opacity: 0; }
+.duck .wing { transform-box: fill-box; transform-origin: center top; }
+.duck .foot { transform-box: fill-box; transform-origin: center; }
+.duck[data-emotion="suspicious"] .brows, .duck[data-emotion="curious"] .brows { opacity: 1; transform: translateY(-3px); }
+.duck[data-emotion="suspicious"] .brow-left { transform: rotate(8deg); transform-origin: 144px 180px; }
+.duck[data-emotion="angry"] .brows, .duck[data-animation="angry"] .brows { opacity: 1; }
+.duck[data-emotion="angry"] .brow-left, .duck[data-animation="angry"] .brow-left { transform: rotate(18deg); transform-origin: 144px 180px; }
+.duck[data-emotion="angry"] .brow-right, .duck[data-animation="angry"] .brow-right { transform: rotate(-18deg); transform-origin: 177px 180px; }
+.duck[data-emotion="happy"] .eyes, .duck[data-animation="happy"] .eyes { transform: scaleY(.8); }
+.duck:is(.blinking, .sleeping, [data-animation="blink"], [data-animation="sleeping"]) .eyes { opacity: 0; }
+.duck:is(.blinking, .sleeping, [data-animation="blink"], [data-animation="sleeping"]) .closed-eyes { opacity: 1; }
+.duck:is(.sleeping, [data-animation="sleeping"]) .zzz { opacity: 1; }
+.duck[data-animation="look_left"] .head { transform: translateX(-5px) rotate(-3deg); transform-origin: 159px 230px; }
+.duck[data-animation="look_right"] .head { transform: translateX(5px) rotate(3deg); transform-origin: 159px 230px; }
+.duck[data-animation="sitting"] .body-motion { transform: scaleY(.92); animation: none; }
+.duck[data-animation="walking"] .body-motion { animation: waddle var(--step-time) ease-in-out infinite; }
+.duck[data-animation="walking"] .left-foot { animation: step var(--step-time) ease-in-out infinite; }
+.duck[data-animation="walking"] .right-foot { animation: step var(--step-time) ease-in-out infinite reverse; }
+.duck[data-animation="startled"] .body-motion { animation: startle .65s ease-out; }
+.duck[data-animation="angry"] .body-motion { animation: grumble .75s ease-in-out; }
+.duck.dragging [data-duck-hit] { cursor: grabbing; }
+.duck:is(.dragging, [data-animation="picked_up"]) .body-motion { animation: dangle .55s ease-in-out infinite alternate; }
+.duck:is(.dragging, [data-animation="picked_up"], [data-animation="falling"]) .wing-left { animation: flap .25s linear infinite alternate; }
+.duck:is(.dragging, [data-animation="picked_up"], [data-animation="falling"]) .wing-right { animation: flap .25s linear infinite alternate-reverse; }
+.duck:is(.dragging, [data-animation="picked_up"]) .left-foot { animation: step .3s infinite; }
+.duck:is(.dragging, [data-animation="picked_up"]) .right-foot { animation: step .3s infinite reverse; }
+.duck[data-animation="falling"] .body-motion { animation: none; transform: scale(.95,1.04); }
+.duck[data-animation="landing"] .body-motion { animation: land .43s ease-out; }
+.duck[data-animation="waking_up"] .body-motion { animation: wake .9s ease-in-out; }
+.duck[data-animation="happy"] .body-motion { animation: waddle .75s ease-in-out; }
+.duck.talking .beak-bottom, .duck[data-animation="talking"] .beak-bottom { animation: talk .22s ease-in-out infinite alternate; }
+.duck.debug-hitbox [data-duck-hit] { stroke: #28775c; stroke-width: 1; stroke-opacity: .45; }
+.duck.hidden { visibility: hidden; }
+.duck.hidden *, .duck.paused * { animation-play-state: paused !important; }
+.duck.reduced * { animation: none !important; transition: none !important; }
+.duck.reduced .body-motion, .duck.reduced .head { transform: none !important; }
+@media (prefers-reduced-motion: reduce) { .duck * { animation: none !important; transition: none !important; } .duck .body-motion, .duck .head { transform: none !important; } }
+@keyframes waddle { 25% { transform: rotate(-2deg) translateY(-3px); } 75% { transform: rotate(2deg) translateY(-3px); } }
+@keyframes step { 50% { transform: translateY(-6px) rotate(10deg); } }
+@keyframes startle { 25% { transform: translateY(-10px) scale(.96,1.06); } }
+@keyframes grumble { 25%,75% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
+@keyframes dangle { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+@keyframes flap { from { transform: rotate(-35deg); } to { transform: rotate(35deg); } }
+@keyframes land { 25% { transform: scale(1.12,.86); } 65% { transform: scale(.97,1.03); } }
+@keyframes wake { 45% { transform: scale(.96,1.06); } }
+@keyframes talk { to { transform: translateY(5px); } }

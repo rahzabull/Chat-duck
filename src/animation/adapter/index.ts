@@ -1,0 +1,29 @@
+export const ANIMATION_IDS = [
+  'idle', 'blink', 'look_left', 'look_right', 'walking', 'startled', 'picked_up',
+  'falling', 'landing', 'sleeping', 'waking_up', 'angry', 'happy', 'talking', 'sitting',
+] as const;
+export type AnimationId = typeof ANIMATION_IDS[number];
+export const EMOTION_IDS = ['neutral', 'curious', 'suspicious', 'startled', 'angry', 'happy', 'sleepy'] as const;
+export type EmotionId = typeof EMOTION_IDS[number];
+
+export interface CharacterAnimationAdapter {
+  play(animation: string): void;
+  setEmotion(emotion: string): void;
+  setEyeTarget(x: number, y: number): void;
+  setDirection(direction: 'left' | 'right'): void;
+  setMovementSpeed(speed: number): void;
+  setDragging(active: boolean): void;
+  setSleeping(active: boolean): void;
+  setVisible(visible: boolean): void;
+  dispose(): void;
+  onAnimationComplete(cb: (animation: string) => void): () => void;
+}
+
+/** Surface concerns belong to the adapter too; callers never inspect its SVG. */
+export interface CharacterSurface extends CharacterAnimationAdapter {
+  hitTest(x: number, y: number): boolean;
+  setReducedMotion(active: boolean): void;
+  setPaused(active: boolean): void;
+  setTalking(active: boolean): void;
+  setDebugHitbox(active: boolean): void;
+}

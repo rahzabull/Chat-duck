@@ -9,7 +9,8 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "pack:win": "electron-vite build && electron-builder --win --dir"
+    "pack:win": "electron-vite build && electron-builder --win --dir",
+    "start:debug": "electron . --debug-hitbox"
   },
   "keywords": [],
   "author": "Ente",
@@ -34,5 +35,14 @@
   "allowScripts": {
     "electron@45.5.0": true
   },
-  "private": true
+  "private": true,
+  "build": {
+    "appId": "com.ente.ducky",
+    "productName": "Ducky",
+    "directories": { "output": "release" },
+    "electronDist": "node_modules/electron/dist",
+    "npmRebuild": false,
+    "files": ["out/**/*", "package.json"],
+    "win": { "target": "dir", "signAndEditExecutable": false }
+  }
 }
