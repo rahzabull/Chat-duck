@@ -4,6 +4,10 @@
   "description": "Ducky.exe — a privacy-first desktop companion by Ente (prototype)",
   "main": "out/main/index.js",
   "scripts": {
+    "figma:split": "node scripts/figma/split-poses.mjs",
+    "prebuild": "node scripts/figma/split-poses.mjs",
+    "predev": "node scripts/figma/split-poses.mjs",
+    "prepack:win": "node scripts/figma/split-poses.mjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",

@@ -1,5 +1,51 @@
 # Ducky implementation status
 
+## Rahul's Figma Ducky (2026-11-25)
+
+- Default character is now the parts-based Figma adapter. The old placeholder
+  remains selectable in development with `--placeholder-duck`. No Rive runtime,
+  npm dependency, network asset or character DOM access outside adapters was added.
+  The development-only `--debug-activity` allowlist now includes all adapter IDs,
+  including focus/alarm and the new coffee/gaming/gesture states.
+- Dependency-free splitter and commit-ready outputs: 20 tightly cropped SVGs,
+  312 preserved character paths, part manifest, static raw-import map and a
+  labeled `assets/characters/ducky/preview.html` grid. The source assets were
+  already untracked when this job began; neither source nor generated work was
+  committed or staged by this job.
+- State/conversation/emotion mappings, directional and prolonged drag poses,
+  shallow/deep sleep, two-stage big-drop recovery, blinking, clamped gaze,
+  discrete breathing, walking feet, mouth pulses and finite gestures implemented.
+  Painted height remains about 160 DIP at size 1 with the existing foot anchor.
+- Future full-pose SVGs in `ducky/extra/` override fallback art and props after
+  regeneration/rebuild. Fallback clock, laptop, controller, coffee, confetti,
+  placard, sunglasses, bread and visitor use outlined palette-matched SVG overlays.
+- `npm run typecheck`: passed. `npm test`: **755 passed, 3 skipped** across
+  33 passing and 2 skipped files. `npm run build`: passed, including automatic
+  asset generation. Existing non-fatal Vite native-config warning remains.
+- New browser fixture performs over 500 assertions using actual Chromium SVG
+  parsing/geometry, all 20 poses and exact idle part counts, gaze/mirror and
+  shared head pivots, alternating feet, state priorities, timer cancellation,
+  deep sleep, drag direction/repeated pickups, big/small drops, extra overrides,
+  painted hit testing and reduced motion. Static pose and activity grids were
+  rendered locally and visually inspected. Generated test captures are in
+  ignored `out/figma-check/`.
+- The offscreen Electron runner hit a Windows AppContainer ACL restriction on
+  the installed Electron directory. No ACLs were changed. Verification used
+  an isolated, local-only headless Chromium process instead. The test harness's
+  sandbox/GPU flags do not alter application BrowserWindow security settings.
+- **Pending Claude:** real desktop drag/drop/hover screenshots at sizes
+  0.6/1.0/1.6 and both directions; continuous-motion shoulder attachment; native
+  click-through and fresh idle CPU measurement. Automated idle verification finds
+  only blink/breath timers and zero running CSS animations; it is not a CPU profile.
+- Classification caveat: flattened fallen supporting contours and small
+  toothpick/mouth details have no certain idle counterpart and remain `extra`.
+  Bored expression strokes are labeled brows; closed/smile strokes are eye arcs.
+  Plain unannotated future extras have coarse palette-based painted hits and
+  whole-pose motion; detailed parts should follow the extra-folder README.
+
+The animation contract contains the complete pose/part list, state mapping,
+extra-art workflow and M7 integration notes.
+
 ## Expansion Phase B — productivity (2026-11-25)
 
 | Area | Implementation / automated verification | Desktop verification |

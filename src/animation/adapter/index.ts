@@ -2,6 +2,7 @@ export const CONVERSATION_STATES = ['listening', 'thinking', 'responding', 'conf
 export type ConversationState = typeof CONVERSATION_STATES[number];
 export const ANIMATION_IDS = [
   'alarm', 'focus', 'celebrate',
+  'gaming', 'laptop', 'coffee', 'shrug', 'laughing', 'confused', 'thinking', 'thought', 'bread',
   'look_around', 'yawn', 'stretch', 'dance', 'side_eye', 'nap', 'strike', 'sunglasses', 'bread_snack', 'visitor',
   'idle', 'blink', 'look_left', 'look_right', 'walking', 'startled', 'picked_up',
   'falling', 'landing', 'sleeping', 'waking_up', 'angry', 'happy', 'talking', 'sitting',
@@ -26,6 +27,8 @@ export interface CharacterAnimationAdapter {
 
 /** Surface concerns belong to the adapter too; callers never inspect its SVG. */
 export interface CharacterSurface extends CharacterAnimationAdapter {
+  /** Optional world-space window origin samples for drag direction and drop distance. */
+  setMotionPosition?(x: number, y: number): void;
   hitTest(x: number, y: number): boolean;
   setReducedMotion(active: boolean): void;
   setPaused(active: boolean): void;

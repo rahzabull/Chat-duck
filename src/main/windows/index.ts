@@ -1,4 +1,4 @@
-import { BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, session } from 'electron';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -34,6 +34,7 @@ function secureWindow(win: BrowserWindow): void {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 }
 const webPreferences = () => ({ preload: join(__dirname, '../preload/index.js'), contextIsolation: true,
+  additionalArguments: !app.isPackaged && process.argv.includes('--placeholder-duck') ? ['--placeholder-duck'] : [],
   nodeIntegration: false, sandbox: true, webSecurity: true, spellcheck: false });
 
 export function createCompanion(): BrowserWindow {

@@ -323,6 +323,12 @@ describe('Milestone 3 controller integration', () => {
       process.argv = [...original, '--debug-activity', 'strike']; create(); expect(controller.state.animation).toBe('strike'); controller.dispose();
       Object.defineProperty(app, 'isPackaged', { value: true, configurable: true }); create(); expect(controller.state.animation).toBe('idle'); controller.dispose();
       Object.defineProperty(app, 'isPackaged', { value: false, configurable: true });
+      for (const id of ['focus', 'alarm', 'gaming', 'coffee', 'shrug', 'laughing', 'confused', 'thinking']) {
+        process.argv = [...original, '--debug-activity', id]; create(); expect(controller.state.animation).toBe(id); controller.dispose();
+      }
+      Object.defineProperty(app, 'isPackaged', { value: true, configurable: true });
+      process.argv = [...original, '--debug-activity', 'coffee']; create(); expect(controller.state.animation).toBe('idle'); controller.dispose();
+      Object.defineProperty(app, 'isPackaged', { value: false, configurable: true });
       process.argv = [...original, '--debug-activity', 'shell']; create(); expect(controller.state.animation).toBe('idle');
     } finally { process.argv = original; Object.defineProperty(app, 'isPackaged', { value: false, configurable: true }); }
   });

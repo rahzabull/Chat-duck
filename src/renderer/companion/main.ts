@@ -2,13 +2,14 @@ import { ConversationUI } from './conversation';
 import { ProductivityUI } from './productivity';
 import { guardedReply } from '../../core/conversation/output';
 import { PlaceholderDuck } from '../../animation/placeholder';
+import { FigmaDuck } from '../../animation/figma';
 import type { CharacterSurface } from '../../animation/adapter';
 import type { CompanionState, CursorUpdate } from '../../shared/types';
 import './style.css';
 
 const host = document.getElementById('character')!;
 const bubble = document.getElementById('bubble') as HTMLButtonElement;
-const adapter: CharacterSurface = new PlaceholderDuck(host);
+const adapter: CharacterSurface = window.ducky.placeholderDuck ? new PlaceholderDuck(host) : new FigmaDuck(host);
 const api = window.ducky;
 const conversation = new ConversationUI(host, bubble, adapter);
 const productivity = new ProductivityUI(host);
@@ -87,10 +88,12 @@ bubble.addEventListener('click', () => { if (!conversation.clickToType() && !con
 const unsubscribeState = api.onState(render);
 const unsubscribeCursor = api.onCursor(update => {
   lastCursor = update;
+  adapter.setMotionPosition?.(update.origin.x, update.origin.y);
   const x = update.cursor.x - update.origin.x; const y = update.cursor.y - update.origin.y;
   adapter.setEyeTarget(x, y); reportHit(x, y);
 });
 const unsubscribePosition = api.onPosition(origin => {
+  adapter.setMotionPosition?.(origin.x, origin.y);
   if (!lastCursor) return;
   lastCursor = { ...lastCursor, origin };
   const x = lastCursor.cursor.x - origin.x; const y = lastCursor.cursor.y - origin.y;

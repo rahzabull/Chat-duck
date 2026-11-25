@@ -7,6 +7,7 @@ import { MemoryStore } from '../memory/store';
 import { freshMemory, memorySummary, remember, visit, type Memory } from '../../core/memory';
 import { dailyMood, EmotionEngine, localDay } from '../../core/emotions';
 import { ACTIVITIES, ACTIVITY_DURATION, type Behaviour, BehaviourScheduler } from '../../core/behaviour';
+import { ANIMATION_IDS } from '../../animation/adapter';
 import { DialogueDirector, thoughtDelay, thoughtSituation, type DialogueContext, type DirectedSpeech, type Situation } from '../../core/dialogue';
 import { InteractionContext, landingSituation, type SituationEvent } from '../../core/dialogue/context';
 import { AppSessionTracker } from '../../core/awareness';
@@ -42,7 +43,7 @@ export class CompanionController {
   private activityTimer?: ReturnType<typeof setTimeout>;
   private activity?: Behaviour;
   private sunglassesUntil = 0;
-  private debugActivity?: Behaviour;
+  private debugActivity?: string;
   private body: Body;
   private scheduler = new BehaviourScheduler();
   private dialogue = new DialogueDirector();
@@ -86,7 +87,7 @@ export class CompanionController {
     this.memory = memoryStore?.value ?? freshMemory(Date.now());
     if (store.value.memoryEnabled) { visit(this.memory, Date.now()); this.emotions.restorePokes(this.memory.dailyPokes); this.saveMemory(); }
     const debugIndex = process.argv.indexOf('--debug-activity');
-    if (!app.isPackaged && debugIndex >= 0 && (ACTIVITIES as readonly string[]).includes(process.argv[debugIndex + 1])) this.debugActivity = process.argv[debugIndex + 1] as Behaviour;
+    if (!app.isPackaged && debugIndex >= 0 && ([...ACTIVITIES, ...ANIMATION_IDS] as readonly string[]).includes(process.argv[debugIndex + 1])) this.debugActivity = process.argv[debugIndex + 1];
     this.state = { sunglasses: false, mood, memory: store.value.memoryEnabled ? memorySummary(this.memory) : [], visible: true, paused: false, sleeping: false, dragging: false, awarenessActive: false, animation: 'idle', animationRevision: 0, emotion: 'neutral',
       direction: 'right', movementSpeed: 0, bubble: null, settings: store.value, brain: initialBrainState(),
       debugHitbox: process.argv.includes('--debug-hitbox'), version: app.getVersion() };
@@ -115,7 +116,15 @@ export class CompanionController {
       if ((changed || sample.fullscreen) && this.speech.current?.priority === 'low') this.dismissBubble();
       if ((sample.fullscreen || sample.private) && this.speech.current?.priority === 'medium') this.dismissBubble();
       for (const event of events) this.respond(event);
-      if (this.debugActivity && !sample.fullscreen) { const activity = this.debugActivity; this.debugActivity = undefined; this.dismissBubble(); this.cancelReaction(); this.performActivity(activity); }
+      if (this.debugActivity && !sample.fullscreen) {
+        const activity = this.debugActivity; this.debugActivity = undefined; this.dismissBubble(); this.cancelReaction();
+        if ((ACTIVITIES as readonly string[]).includes(activity)) this.performActivity(activity as Behaviour);
+        else {
+          // Development-only previews for adapter states without autonomous scheduler entries.
+          // Keep physical scheduler activities (notably walking) on their normal path above.
+          this.cancelActivity(); this.react(activity, 'neutral', activity === 'sleeping' ? 75000 : 10000);
+        }
+      }
     }, active => {
       if (!active) { this.fullscreenKnown = false; this.cancelActivity(); if (this.body.walking) { this.body.walking = false; this.body.vx = 0; } this.setAnimation(this.state.paused ? 'idle' : this.baseAnimation()); }
       active = active && this.store.value.appAwareness;

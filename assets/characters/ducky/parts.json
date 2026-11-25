@@ -1,0 +1,482 @@
+{
+  "idle": {
+    "viewBox": [
+      0,
+      0,
+      207.444,
+      303.596
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "beak": 1,
+      "nostril": 2
+    },
+    "pathCount": 15,
+    "blink": true
+  },
+  "bored": {
+    "viewBox": [
+      0,
+      0,
+      207.434,
+      303.596
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "beak": 1,
+      "nostril": 2,
+      "brow": 2
+    },
+    "pathCount": 15,
+    "blink": false
+  },
+  "smile": {
+    "viewBox": [
+      0,
+      0,
+      207.434,
+      303.596
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "beak": 1,
+      "nostril": 2,
+      "eye-arc": 2
+    },
+    "pathCount": 15,
+    "blink": false
+  },
+  "dragged_disgusted": {
+    "viewBox": [
+      0,
+      0,
+      207.434,
+      317.545
+    ],
+    "parts": {
+      "foot-left": 1,
+      "foot-right": 1,
+      "tail": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "beak": 1,
+      "nostril": 2,
+      "brow": 2
+    },
+    "pathCount": 15,
+    "blink": false
+  },
+  "not_interested": {
+    "viewBox": [
+      0,
+      0,
+      207.444,
+      303.604
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "eye-right": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "beak": 1,
+      "nostril": 2,
+      "eye-arc": 1
+    },
+    "pathCount": 15,
+    "blink": false
+  },
+  "sleepy": {
+    "viewBox": [
+      0,
+      0,
+      207.434,
+      303.604
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "beak": 1,
+      "nostril": 2,
+      "eye-arc": 2
+    },
+    "pathCount": 15,
+    "blink": false
+  },
+  "deep_sleep_a": {
+    "viewBox": [
+      0,
+      0,
+      207.434,
+      303.604
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "beak": 1,
+      "nostril": 2,
+      "eye-arc": 2,
+      "extra": 1
+    },
+    "pathCount": 16,
+    "blink": false
+  },
+  "deep_sleep_b": {
+    "viewBox": [
+      0,
+      0,
+      207.434,
+      285.843
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "beak": 1,
+      "nostril": 2,
+      "eye-arc": 2,
+      "extra": 1
+    },
+    "pathCount": 16,
+    "blink": false
+  },
+  "dragged_up_down": {
+    "viewBox": [
+      0,
+      0,
+      207.444,
+      317.542
+    ],
+    "parts": {
+      "foot-left": 1,
+      "foot-right": 1,
+      "tail": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "beak": 1,
+      "nostril": 2
+    },
+    "pathCount": 15,
+    "blink": true
+  },
+  "emote": {
+    "viewBox": [
+      0,
+      0,
+      207.444,
+      303.607
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "beak": 1,
+      "nostril": 2
+    },
+    "pathCount": 15,
+    "blink": true
+  },
+  "listening": {
+    "viewBox": [
+      0,
+      0,
+      207.444,
+      303.607
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "beak": 1,
+      "nostril": 2
+    },
+    "pathCount": 15,
+    "blink": true
+  },
+  "interested": {
+    "viewBox": [
+      0,
+      0,
+      207.444,
+      303.607
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "beak": 1,
+      "nostril": 2,
+      "brow": 2
+    },
+    "pathCount": 17,
+    "blink": true
+  },
+  "happy": {
+    "viewBox": [
+      0,
+      0,
+      207.434,
+      303.607
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "beak": 1,
+      "nostril": 2,
+      "brow": 2
+    },
+    "pathCount": 17,
+    "blink": true
+  },
+  "dragged_right": {
+    "viewBox": [
+      0,
+      0,
+      207.433,
+      321.759
+    ],
+    "parts": {
+      "foot-right": 1,
+      "foot-left": 1,
+      "tail": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "beak": 1,
+      "nostril": 2
+    },
+    "pathCount": 15,
+    "blink": true
+  },
+  "thinking_a": {
+    "viewBox": [
+      0,
+      0,
+      207.434,
+      303.607
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "extra": 1,
+      "beak": 1,
+      "nostril": 2
+    },
+    "pathCount": 16,
+    "blink": true
+  },
+  "thinking_b": {
+    "viewBox": [
+      0,
+      0,
+      207.434,
+      303.607
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "extra": 2,
+      "nostril": 2,
+      "beak": 1
+    },
+    "pathCount": 17,
+    "blink": true
+  },
+  "chilling": {
+    "viewBox": [
+      0,
+      0,
+      207.444,
+      303.607
+    ],
+    "parts": {
+      "tail": 1,
+      "foot-left": 1,
+      "foot-right": 1,
+      "body": 1,
+      "head": 1,
+      "beak": 1,
+      "nostril": 2,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "extra": 1
+    },
+    "pathCount": 16,
+    "blink": true
+  },
+  "dragged_left": {
+    "viewBox": [
+      0,
+      0,
+      207.444,
+      329.544
+    ],
+    "parts": {
+      "foot-left": 1,
+      "foot-right": 1,
+      "tail": 1,
+      "body": 1,
+      "head": 1,
+      "wing-left": 2,
+      "wing-right": 2,
+      "tuft": 1,
+      "eye-left": 1,
+      "eye-right": 1,
+      "beak": 1,
+      "nostril": 2
+    },
+    "pathCount": 15,
+    "blink": true
+  },
+  "fallen_a": {
+    "viewBox": [
+      0,
+      0,
+      331.37,
+      176.894
+    ],
+    "parts": {
+      "body": 1,
+      "head": 1,
+      "wing-right": 2,
+      "wing-left": 2,
+      "tuft": 1,
+      "eye-right": 1,
+      "eye-left": 1,
+      "beak": 1,
+      "nostril": 2,
+      "extra": 2,
+      "foot-left": 1,
+      "foot-right": 1
+    },
+    "pathCount": 16,
+    "blink": true
+  },
+  "fallen_b": {
+    "viewBox": [
+      0,
+      0,
+      331.37,
+      176.894
+    ],
+    "parts": {
+      "body": 1,
+      "head": 1,
+      "wing-right": 2,
+      "wing-left": 2,
+      "tuft": 1,
+      "beak": 1,
+      "nostril": 2,
+      "foot-left": 1,
+      "foot-right": 1,
+      "eye-arc": 2,
+      "extra": 2
+    },
+    "pathCount": 16,
+    "blink": false
+  }
+}

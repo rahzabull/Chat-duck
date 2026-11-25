@@ -1,0 +1,35 @@
+{
+  "source": "Figma file qlg9Qa3kMHyFcnguoeWvKj, frame 29334:29915 'all ducky exp' (Rahul's Ducky). all-ducky-exp.svg is the frame exported at scale 0.678933 (4096 px wide); multiply the frame-relative rects below by 0.678933 to get SVG coordinates.",
+  "exportScale": 0.678933,
+  "sheetLabels": {
+    "left column": ["dragged disgusted (p03)", "dragged up/down (p08)", "dragged right (p13)", "dragged left (p17)"],
+    "row 1": "idle / bored / smile (p00 p01 p02)",
+    "row 2": "not interested / sleepy / deep sleep (p04 p05 p06 p07)",
+    "row 3": "emotes / listening / interested / happy (p09 p10 p11 p12)",
+    "row 4": "thinking / chilling (p14 p15 p16)",
+    "row 5": "fallen (p18 p19)"
+  },
+  "poses": [
+    {"id": "p00", "label": "idle", "x": 4165, "y": 289, "w": 282, "h": 423},
+    {"id": "p01", "label": "bored", "x": 4490, "y": 289, "w": 282, "h": 423},
+    {"id": "p02", "label": "smile", "x": 4812, "y": 289, "w": 282, "h": 423},
+    {"id": "p03", "label": "dragged_disgusted", "x": 1622, "y": 429, "w": 282, "h": 444},
+    {"id": "p04", "label": "not_interested", "x": 4156, "y": 801, "w": 282, "h": 424},
+    {"id": "p05", "label": "sleepy", "x": 4513, "y": 801, "w": 282, "h": 424},
+    {"id": "p06", "label": "deep_sleep_a", "x": 4839, "y": 801, "w": 282, "h": 424},
+    {"id": "p07", "label": "deep_sleep_b", "x": 5202, "y": 827, "w": 282, "h": 397},
+    {"id": "p08", "label": "dragged_up_down", "x": 1618, "y": 1010, "w": 282, "h": 444},
+    {"id": "p09", "label": "emote", "x": 4165, "y": 1343, "w": 282, "h": 424},
+    {"id": "p10", "label": "listening", "x": 4549, "y": 1343, "w": 282, "h": 424},
+    {"id": "p11", "label": "interested", "x": 4884, "y": 1343, "w": 282, "h": 424},
+    {"id": "p12", "label": "happy", "x": 5228, "y": 1343, "w": 282, "h": 424},
+    {"id": "p13", "label": "dragged_right", "x": 1638, "y": 1524, "w": 282, "h": 450},
+    {"id": "p14", "label": "thinking_a", "x": 4188, "y": 1838, "w": 282, "h": 424},
+    {"id": "p15", "label": "thinking_b", "x": 4564, "y": 1838, "w": 282, "h": 424},
+    {"id": "p16", "label": "chilling", "x": 4901, "y": 1838, "w": 282, "h": 424},
+    {"id": "p17", "label": "dragged_left", "x": 1638, "y": 2107, "w": 282, "h": 462},
+    {"id": "p18", "label": "fallen_a", "x": 4217, "y": 2394, "w": 464, "h": 237},
+    {"id": "p19", "label": "fallen_b", "x": 4740, "y": 2394, "w": 464, "h": 237}
+  ],
+  "partsInIdlePose": "Every standing pose is built from the same layers (in z-order): tail nub (~81x34, yellow), left foot and right foot (~73x40 ellipses, #F7673B), body (~193x163, #FFC954), head (~282x259 open path, #FFC954), left wing and right wing (~45x38 U-shapes), hair tuft (~129x74), eyes (30x30 dark circles, replaced by lines/arcs in some poses), beak (~135x56, #F7673B), two tiny nostril strokes. Extras per pose: brows/closed-eye lines (~52x8), smile-eye arcs (~51x29), tears/drops, toothpick (thinking), dangling round feet (~67x67) when dragged. Outline #232323, stroke-width 6 (in Figma units), round caps/joins."
+}

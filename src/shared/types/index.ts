@@ -50,6 +50,7 @@ export interface CompanionState {
 export interface CursorUpdate { cursor: Point; origin: Point }
 export type Command = 'talk' | 'tasks' | 'add-task' | 'add-reminder' | 'focus' | 'notes' | 'show' | 'hide' | 'pause' | 'mute' | 'reset' | 'settings' | 'quit';
 export interface DuckyAPI {
+  readonly placeholderDuck?: boolean;
   productivity(action: import('../../core/productivity/types').ProductivityAction): Promise<import('../../core/productivity/types').ProductivityResult>;
   talkSave(pinned: boolean): Promise<import('../../core/productivity/types').ProductivityResult>;
   talkCopy(): Promise<void>;

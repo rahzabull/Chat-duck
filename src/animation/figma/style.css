@@ -1,0 +1,64 @@
+.figma-duck, .figma-props { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.figma-duck { --step-time: .55s; --head-rise: 0px; --head-scale: 1; --tilt: 0deg; }
+.figma-duck [data-duck-hit] { pointer-events: visiblePainted; cursor: grab; }
+.figma-duck.dragging [data-duck-hit] { cursor: grabbing; }
+.figma-props * { pointer-events: none; }
+.figma-props [data-prop] { display: none; }
+.figma-duck .figma-motion { transform-box: view-box; transform-origin: 160px 299px; }
+.figma-duck g[data-part], .figma-duck .cranial, .figma-duck .eye-blink { transform-box: fill-box; transform-origin: center; }
+.figma-duck .cranial { transform: translateY(var(--head-rise)) rotate(var(--tilt)) scale(var(--head-scale)); }
+.figma-duck g[data-part="body"] { transform-origin: center bottom; }
+.figma-duck g[data-part^="foot-"] { transform-origin: center bottom; }
+.figma-duck[data-breath="1"] { --head-rise: -.6px; --head-scale: 1.003; }
+.figma-duck[data-breath="2"] { --head-rise: -1.2px; --head-scale: 1.006; }
+.figma-duck[data-breath="1"] g[data-part="body"] { transform: scaleY(1.006); }
+.figma-duck[data-breath="2"] g[data-part="body"] { transform: scaleY(1.012); }
+.figma-duck.blinking .eye-blink { transform: scaleY(.08); }
+.figma-duck:is([data-conversation="confused"], [data-activity="confused"]) { --tilt: 9deg; }
+.figma-duck[data-activity="look_left"] { --tilt: -4deg; }
+.figma-duck[data-activity="look_right"] { --tilt: 4deg; }
+.figma-duck:is([data-emotion="angry"], [data-emotion="annoyed"], [data-activity="angry"]) g[data-part="brow"] { transform: translateY(4px) rotate(7deg); }
+.figma-duck:is([data-emotion="angry"], [data-emotion="annoyed"], [data-activity="angry"]) .figma-motion { animation: figma-shake .65s ease-in-out; }
+.figma-duck[data-activity="walking"] g[data-part="foot-left"] { animation: figma-step var(--step-time) ease-in-out infinite; }
+.figma-duck[data-activity="walking"] g[data-part="foot-right"] { animation: figma-step var(--step-time) ease-in-out infinite; animation-delay: calc(var(--step-time) * -.5); }
+.figma-duck:is(.dragging, [data-activity="picked_up"], [data-activity="falling"]) g[data-part="wing-left"] { animation: figma-flap .22s ease-in-out infinite alternate; }
+.figma-duck:is(.dragging, [data-activity="picked_up"], [data-activity="falling"]) g[data-part="wing-right"] { animation: figma-flap .22s ease-in-out infinite alternate-reverse; }
+.figma-duck[data-activity="celebrate"] g[data-part="wing-left"] { animation: figma-flap .22s ease-in-out 5 alternate; }
+.figma-duck[data-activity="celebrate"] g[data-part="wing-right"] { animation: figma-flap .22s ease-in-out 5 alternate-reverse; }
+.figma-duck[data-activity="landing"] .figma-motion { animation: figma-land .43s ease-out; }
+.figma-duck:is([data-activity="startled"], [data-conversation="interrupted"]) .figma-motion { animation: figma-startle .6s ease-out; }
+.figma-duck:is([data-activity="happy"], [data-activity="laughing"], [data-conversation="amused"]) .figma-motion { animation: figma-laugh .35s ease-in-out 4; }
+.figma-duck[data-activity="dance"] .figma-motion { animation: figma-dance .5s ease-in-out 4; }
+.figma-duck:is([data-activity="stretch"], [data-activity="waking_up"]) .figma-motion { animation: figma-stretch 1.8s ease-in-out; }
+.figma-duck:is([data-activity="shrug"], [data-activity="stretch"], [data-conversation="unsure"]) g[data-part="wing-left"] { transform: rotate(35deg); }
+.figma-duck:is([data-activity="shrug"], [data-activity="stretch"], [data-conversation="unsure"]) g[data-part="wing-right"] { transform: rotate(-35deg); }
+.figma-duck[data-conversation="explaining"] g[data-part^="wing-"] { animation: figma-flap .55s ease-in-out 5 alternate; }
+.figma-duck.talking .mouth { animation: figma-talk .24s ease-in-out infinite alternate; }
+.figma-duck[data-activity="yawn"] .mouth { transform: scaleY(1.2); }
+.figma-duck[data-activity="look_around"] .cranial { animation: figma-look 2.4s steps(1); }
+.figma-props[data-activity="alarm"] [data-prop="alarm"] { transform-box: fill-box; transform-origin: center; animation: figma-shake .16s ease-in-out 12; }
+.figma-props[data-activity="celebrate"] [data-prop="celebrate"] { animation: figma-confetti 1.1s ease-out both; }
+.figma-props[data-activity="bread_snack"] [data-prop="bread"] { animation: figma-nibble .7s steps(2) 5; }
+.figma-props[data-activity="visitor"] [data-prop="visitor"] { animation: figma-visit 10s linear both; }
+.figma-duck.debug-hitbox [data-duck-hit] { stroke: #28775c; stroke-opacity: .65; }
+.figma-hidden .figma-duck, .figma-hidden .figma-props { visibility: hidden; }
+.figma-hidden :is(.figma-duck, .figma-props) *, .figma-paused :is(.figma-duck, .figma-props) * { animation: none !important; }
+.figma-reduced :is(.figma-duck, .figma-props) * { animation: none !important; transition: none !important; }
+.figma-reduced .figma-duck { --tilt: 0deg; --head-rise: 0px; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.figma-duck, .figma-props) * { animation: none !important; transition: none !important; }
+  .figma-duck { --tilt: 0deg; --head-rise: 0px; }
+}
+@keyframes figma-flap { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
+@keyframes figma-step { 50% { transform: translateY(-9px) rotate(8deg); } }
+@keyframes figma-land { 25% { transform: scale(1.09,.88); } 65% { transform: scale(.98,1.03); } }
+@keyframes figma-talk { to { transform: translateY(1.5px) scaleY(1.08); } }
+@keyframes figma-startle { 30% { transform: translateY(-9px) scale(.97,1.04); } }
+@keyframes figma-shake { 25%,75% { transform: translateX(-2px); } 50% { transform: translateX(2px); } }
+@keyframes figma-laugh { 50% { transform: translateY(-4px); } }
+@keyframes figma-dance { 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+@keyframes figma-stretch { 50% { transform: scale(.98,1.03); } }
+@keyframes figma-look { 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+@keyframes figma-confetti { from { opacity: 1; transform: translateY(8px); } to { opacity: 0; transform: translateY(-18px); } }
+@keyframes figma-nibble { 50% { transform: translate(-3px,-3px); } }
+@keyframes figma-visit { 0%,100% { transform: translateX(-60px); opacity: 0; } 20%,80% { transform: none; opacity: 1; } }

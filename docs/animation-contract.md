@@ -1,5 +1,147 @@
 # Character animation contract
 
+## Rahul Figma adapter (default, November 2026)
+
+`src/animation/figma/FigmaDuck` now implements `CharacterSurface`. The original
+`CharacterAnimationAdapter` interface is unchanged. All character DOM, painted
+hit regions, gaze conversion, pose selection and animation timers belong to the
+adapter. The renderer only constructs a surface and supplies state. The sections
+below describing the placeholder remain historical/reference material for M7.
+
+The development flag `--placeholder-duck` selects the original adapter. Main
+forwards it to the sandboxed preload only in unpackaged builds; the renderer
+reads the immutable `ducky.placeholderDuck` value. Normal launches use Rahul's
+art. Example: `electron . --placeholder-duck --debug-activity stretch`.
+
+`--debug-activity` now accepts every animation ID as well as the existing
+scheduler IDs. New adapter IDs are gaming, laptop, coffee, shrug, laughing,
+confused, thinking, thought and bread. For example, launch
+`electron . --debug-activity coffee` to inspect the fallback or supplied extra.
+Non-scheduler previews hold main's reaction state for ten seconds (sleeping for
+75 seconds so deep sleep can be checked); finite adapter clips still finish at
+their normal duration. The additional IDs are not added to autonomous scheduling.
+
+### Assets and build
+
+Run `npm run figma:split` after changing the sheet, pose rectangles or extras.
+It also runs before `npm run dev`, `npm run build` and `npm run pack:win`.
+The dependency-free script samples absolute M/L/H/V/C/Q path coordinates,
+includes half the stroke width in approximate bounds, assigns paths by their
+centres to the scaled pose rectangles, and writes tight SVGs with six-pixel
+padding. It deliberately rejects unsupported path commands/transforms. Nine
+label paths and all sheet rectangles/clips are omitted; **312 character paths**
+are retained, including white toothpicks and blue sleep bubbles.
+
+Commit-ready outputs live in `assets/characters/ducky/poses/`, `parts.json`,
+`assets.generated.ts` and `preview.html`. Open the preview directly from disk.
+The static import map uses Vite `?raw`; only trusted build assets and fixed local
+prop markup enter `innerHTML`. There is no runtime fetch or SVG from model text.
+
+All 20 pose names:
+`idle`, `bored`, `smile`, `dragged_disgusted`, `not_interested`, `sleepy`,
+`deep_sleep_a`, `deep_sleep_b`, `dragged_up_down`, `emote`, `listening`,
+`interested`, `happy`, `dragged_right`, `thinking_a`, `thinking_b`, `chilling`,
+`dragged_left`, `fallen_a`, `fallen_b`.
+
+Parts: `tail`, `foot-left`, `foot-right`, `body`, `head`, `wing-left`,
+`wing-right`, `tuft`, `eye-left`, `eye-right`, `beak`, `nostril`, `brow`,
+`eye-arc`, `extra`. Every path is annotated. Consecutive paths of one part share
+an animated group, especially each wing's separate fill and outline. Idle has
+one of each named structural part, two wing paths per wing and two nostril
+paths: 15 paths total. It has no brow, eye-arc or extra. `parts.json` records
+per-pose path counts and whether both eyes are dots. Fallen supporting contours
+and toothpick/mouth details have ambiguous correspondence to idle and are kept
+as `extra`; they do not get wing or eye motion.
+
+### State to pose
+
+| Input | Pose / behavior |
+| --- | --- |
+| idle / walking | idle; walking alternates the feet |
+| bored / not_interested / suspicious | bored / not_interested / not_interested |
+| curious / interested | interested |
+| happy / amused / laughing | happy / smile / smile; finite laugh bounce |
+| angry / annoyed | bored, lowered brows and one short shake |
+| startled / interrupted | emote, short flinch |
+| sleeping / nap | sleepy; sustained sleep becomes deep_sleep_a at 60 seconds, then alternates a/b every 8 seconds |
+| conversation listening | listening |
+| conversation thinking / thinking / thought | thinking_a/b every 3 seconds |
+| responding / explaining | idle with independent mouth / emote with finite wing gestures |
+| conversation confused / unsure / sarcastic | interested with head tilt / emote with shrug / not_interested |
+| conversation_end | idle, then clearing conversation resumes underlying activity |
+| sitting / focus / laptop / coffee / sunglasses | chilling plus applicable overlay |
+| gaming / visitor | interested with controller / listening with small visitor |
+| alarm / celebrate / shrug | emote with clock / happy with confetti and finite flap / emote with lifted wings |
+| yawn / stretch / dance / bread_snack / strike | sleepy / emote / happy / happy / bored, with gesture or prop |
+| dragged | horizontal origin delta selects dragged_left/right; predominantly vertical selects dragged_up_down |
+| long or repeated drag | dragged_disgusted after 3 seconds or three pickups within 15 seconds |
+| falling | dragged_up_down with flapping wings |
+| landing | short squash; drops of at least 60 DIP use fallen_a for 550 ms, fallen_b until 1200 ms, then idle |
+
+Physical dragging, falling and landing take priority over conversation; sleep
+also takes priority. Conversation temporarily overrides the underlying activity.
+A big-drop recovery retains its visual through main's existing 430 ms physical
+recovery/idle update. A new action, pause or hide cancels it. Finite reactions
+emit one completion; cancellation does not emit stale completion events.
+
+`CharacterSurface` has one optional extension, `setMotionPosition(x,y)`, for
+world-space window origin samples already delivered by cursor/position IPC.
+This avoids confusing local cursor gaze with drag velocity. No new timer or IPC
+channel is added. Horizontal delta sign chooses drag direction; greatest downward
+travel from the fall apex distinguishes big drops. A stationary drag retains
+its last direction until the three-second disgust transition.
+
+### Motion, sizing and hit testing
+
+The surrounding logical artboard remains 320x300. Standing art is about 160 DIP
+tall at size 1, matching the placeholder's painted height, with feet anchored at
+y=300. All Rahul poses share one scale, so fallen poses lie down without growing.
+Existing character-size and conversation/productivity layout scaling still apply.
+Direction uses an outer SVG group mirrored about x=160. Cursor targets are
+converted with the inverse screen CTM, including direction and layout scaling,
+and eye dots move at most three source pixels.
+
+Part groups use CSS fill-box origins. Wings pivot about the midpoint of their
+open shoulder edge. Static SVG translation/mirroring uses separate outer groups;
+no element combines an SVG transform attribute with CSS transform-origin. Head
+rig wrappers use a shared fixed view-box pivot so moving eye/mouth child bounds
+cannot change the head pivot. The original painter order is preserved.
+
+Blink closes eye dots for 120 ms at random 2–6 second intervals; line/arc poses
+do not blink. Breathing has four discrete steps, 400 ms apart, with eight seconds
+at rest. There is no continuous idle animation, transition or requestAnimationFrame
+loop. Walking/dragging/falling/talking loops exist only during those active states;
+celebration, laughter and gestures are finite. Hide/pause/dispose clear every
+adapter timer. Reduced motion disables motion loops and breath/thinking/deep-sleep
+alternation; the one-time deep-sleep transition and static expressions remain.
+
+Only painted body/head/wings/feet/tuft/beak paths have `data-duck-hit`.
+Props, labels, tail and transparent canvas are click-through. Eyes and nostrils
+do not steal hits from the head/beak beneath them.
+
+### Adding extra full poses and future Rive art
+
+Drop trusted SVGs in `assets/characters/ducky/extra/<activity>.svg` and regenerate
+the static map. See `assets/characters/ducky/extra/README.md` for filenames and
+part annotations. Exact activity names win, followed by aliases such as laptop
+for focus and bread for bread_snack. A supplied full pose replaces both fallback
+art and its prop without adapter code changes. Plain palette-colored exports
+get painted hits; annotated groups enable detailed part motion. Fallback props
+are separate SVG overlays using #232323 outlines, #FFC954 and #F7673B.
+
+M7 can replace this surface at construction without renderer/business-logic
+changes. Preserve the existing trigger/emotion/conversation tables below, painted
+hits, completion cancellation, independent mouth/accessories and low idle work.
+Map `setMotionPosition` to `dragVelocityX/Y` and a big-drop trigger internally if
+Rive needs it; the optional extension can otherwise be ignored. The 320x300
+artboard and bottom anchor remain the integration coordinates, not sheet units.
+
+The automated Chromium fixture parses all poses and exercises real SVG geometry,
+shared tilt pivots, gaze/mirroring, foot alternation, timer lifecycle, priorities,
+sleep/drag/landing transitions, extra overrides and reduced motion. Static
+preview/activity screenshots were inspected. Native desktop drag/drop acceptance
+and a fresh idle CPU measurement remain for Claude.
+
 ## Expansion Phase B productivity states
 
 The adapter `play` allowlist now includes these IDs. Renderer business logic must
