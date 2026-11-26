@@ -1,11 +1,13 @@
-# Snapshot of the existing offline .venv, 2026-11-26. Do not install during this job.
+# Round-two training pins, compatible with the llama.cpp converter's Transformers 4.x.
+# Claude installs only if dependency preflight fails. Keep the existing CUDA torch wheel.
+# TRL is unused by this pipeline; remove it when applying these training pins.
 torch==2.11.0+cu128
-transformers==5.24.1
-peft==0.22.0
-trl==1.19.0
-datasets==5.2.0
+transformers==4.57.6
+tokenizers==0.22.2
+huggingface-hub==0.36.2
+datasets==4.4.1
+peft==0.18.0
 accelerate==1.16.0
 safetensors==0.8.0
-tokenizers==0.23.3
-numpy==2.5.5
+numpy==2.2.6
 regex==2026.11.25

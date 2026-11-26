@@ -1,0 +1,82 @@
+{
+  "ducky:4b-v1/app/playful": {
+    "scored": 45,
+    "total": 45,
+    "mean": 5.488888888888889
+  },
+  "ducky:4b-v1/app/sarcastic": {
+    "scored": 75,
+    "total": 75,
+    "mean": 5.173333333333333
+  },
+  "ducky:4b-v1/app/unhinged": {
+    "scored": 67,
+    "total": 67,
+    "mean": 6.104477611940299
+  },
+  "ducky:4b-v1/app/wholesome": {
+    "scored": 43,
+    "total": 43,
+    "mean": 5.465116279069767
+  },
+  "ducky:4b-v1/short/playful": {
+    "scored": 45,
+    "total": 45,
+    "mean": 5.088888888888889
+  },
+  "ducky:4b-v1/short/sarcastic": {
+    "scored": 75,
+    "total": 75,
+    "mean": 4.906666666666666
+  },
+  "ducky:4b-v1/short/unhinged": {
+    "scored": 67,
+    "total": 67,
+    "mean": 4.880597014925373
+  },
+  "ducky:4b-v1/short/wholesome": {
+    "scored": 43,
+    "total": 43,
+    "mean": 4.4186046511627906
+  },
+  "ducky:4b-v2/app/playful": {
+    "scored": 45,
+    "total": 45,
+    "mean": 7.111111111111111
+  },
+  "ducky:4b-v2/app/sarcastic": {
+    "scored": 75,
+    "total": 75,
+    "mean": 6.373333333333333
+  },
+  "ducky:4b-v2/app/unhinged": {
+    "scored": 67,
+    "total": 67,
+    "mean": 7.2388059701492535
+  },
+  "ducky:4b-v2/app/wholesome": {
+    "scored": 43,
+    "total": 43,
+    "mean": 6.046511627906977
+  },
+  "ducky:4b-v2/short/playful": {
+    "scored": 45,
+    "total": 45,
+    "mean": 6.933333333333334
+  },
+  "ducky:4b-v2/short/sarcastic": {
+    "scored": 75,
+    "total": 75,
+    "mean": 4.96
+  },
+  "ducky:4b-v2/short/unhinged": {
+    "scored": 67,
+    "total": 67,
+    "mean": 6.82089552238806
+  },
+  "ducky:4b-v2/short/wholesome": {
+    "scored": 43,
+    "total": 43,
+    "mean": 6.813953488372093
+  }
+}

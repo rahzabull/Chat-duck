@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 import logging
 from pathlib import Path
 import random
-from common import APP, ROOT, PERSONALITIES, digest, dumps, logging_run, snapshot, write_json, write_jsonl
+from common import APP, ROOT, PERSONALITIES, digest, dumps, load_contract, logging_run, snapshot, write_json, write_jsonl
+from voice import TOPIC_SEEDS, gold_rows, voice_hashes
 
 APPS = {'browser':('Chrome','YouTube – lofi beats'),'code':('VS Code','VS Code – Python functions'),
         'design':('Figma','Figma – Landing page'),'video_edit':('Video Editor','Video – timeline editing'),
@@ -89,6 +90,36 @@ def conversation_context(personality,profanity,index,contract,rng,text):
                           {'role':'assistant','text':contract['talk']['talk_greeting'][0],'at':context['now']-2000},*context['turns']]
     return context
 
+def round2_contexts(contract, seed, ambient_count=600, conversation_count=300):
+    """New input prompts only; assistant answers still come from local gold/Qwen."""
+    rng=random.Random(seed+200); rows=[]
+    events=list(dict.fromkeys(x['situation'] for x in gold_rows()[0] if x['situation'] in contract['lines']))
+    for i in range(ambient_count):
+        personality=('unhinged','sarcastic')[i%2]; event=events[(i//2)%len(events)]
+        c=ambient(event,personality,bool((i//(2*len(events)))%2),10000+i,contract,rng)
+        rows.append({'id':'r2-ambient-'+digest(c)[:20],'kind':'ambient','situation':event,
+                     'personality':personality,'context':c,'round':2})
+    # Ten prompt families x thirty topics = 300 distinct questions. No fabricated answers.
+    templates=[('banter','hey ducky, what is your official position on {topic}?'),
+        ('roast','gently roast my decision to make {topic} my entire personality'),
+        ('absurd','what if {topic} ran the world for a day?'),
+        ('joke','tell me a joke about {topic}'),
+        ('bored',"I'm bored. Give me a ridiculous imaginary adventure involving {topic}."),
+        ('emotional',"I'm feeling overwhelmed. Can you cheer me up with a gentle joke about {topic}?"),
+        ('emotional',"I had a rough day. Be funny but kind; distract me with {topic}."),
+        ('banter','what is your villain origin story involving {topic}?'),
+        ('absurd','pitch an obviously fake conspiracy about {topic}'),
+        ('roast','roast me gently for procrastinating by researching {topic}')]
+    for i in range(conversation_count):
+        category,template=templates[(i//len(TOPIC_SEEDS))%len(templates)]
+        text=template.format(topic=TOPIC_SEEDS[i%len(TOPIC_SEEDS)])
+        personality=('unhinged','sarcastic')[i%2]
+        c=conversation_context(personality,bool((i//2)%2),10000+i,contract,rng,text)
+        c['turns']=c['turns'][-1:]; c['memories']=[]; c['summaries']=[]; c['availableTools']=[]
+        rows.append({'id':'r2-chat-'+digest(c)[:20],'kind':'conversation','situation':'humour_'+category,
+                     'personality':personality,'context':c,'round':2,'expectNoTool':True})
+    return rows
+
 def assign_splits(rows,seed):
     # Keep identical conversation questions together across personalities/date variations.
     strata=defaultdict(lambda:defaultdict(list))
@@ -130,10 +161,15 @@ def assign_splits(rows,seed):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--app-repo',type=Path,default=APP); p.add_argument('--output-dir',type=Path,default=ROOT/'data')
+    p.add_argument('--app-repo',type=Path,default=APP); p.add_argument('--output-dir',type=Path,default=ROOT/'data/round2')
+    p.add_argument('--contract',type=Path,default=ROOT/'data/app_contract.json',help='Reuse local round-one interface snapshot; no app execution')
+    p.add_argument('--refresh-contract',action='store_true')
+    p.add_argument('--extra-ambient',type=int,default=600); p.add_argument('--extra-conversation',type=int,default=300)
     p.add_argument('--ambient',type=int,default=2500); p.add_argument('--conversation',type=int,default=1200)
     p.add_argument('--seed',type=int,default=42); a=p.parse_args(); run=logging_run('make_contexts')
-    contract=snapshot(a.app_repo,a.output_dir/'app_contract.json'); rng=random.Random(a.seed); rows=[]
+    if min(a.extra_ambient,a.extra_conversation)<0: p.error('Extra counts must be nonnegative')
+    contract=snapshot(a.app_repo,a.output_dir/'app_contract.json') if a.refresh_contract else load_contract(a.contract)
+    write_json(a.output_dir/'app_contract.json',contract); rng=random.Random(a.seed); rows=[]
     grid=[(event,personality,profanity) for event in contract['lines'] for personality in PERSONALITIES for profanity in (False,True)]
     if a.ambient<len(grid): p.error(f'--ambient must be >= {len(grid)} to cover every situation/personality/setting')
     for i in range(a.ambient):
@@ -165,15 +201,21 @@ def main():
         r.pop('expectedTool',None); r['expectNoTool']=True; r['situation']='tool_result'
         r.pop('expectedDue',None); r.pop('expectedDueTime',None)
         r['id']='conversation-'+digest(r['context'])[:20]
+    rows += round2_contexts(contract,a.seed,a.extra_ambient,a.extra_conversation)
     if len({r['id'] for r in rows})!=len(rows): raise ValueError('Duplicate contexts; change seed or generation recipe')
     assign_splits(rows,a.seed)
+    # Exact gold questions must never enter validation, including older fixture variants.
+    gold_questions={x['user'].strip().casefold() for x in gold_rows()[1]}
+    for row in rows:
+        if row['kind']=='conversation' and row['context']['turns'][-1]['text'].strip().casefold() in gold_questions:
+            row['split']='train'
     write_jsonl(a.output_dir/'contexts.jsonl',rows)
     write_jsonl(a.output_dir/'heldout.jsonl',[r for r in rows if r['split']=='val'])
     bake=[]
     for round_ in range(2):
         for i,c in enumerate(contract['bakeoff']): bake.append({'id':f'bakeoff-{round_}-{i}','kind':'ambient','situation':c['event'],'personality':'sarcastic','context':c,'split':'test','bakeoffRound':round_})
     write_jsonl(a.output_dir/'bakeoff.jsonl',bake)
-    report={'seed':a.seed,'total':len(rows),'ambient':a.ambient,'conversation':a.conversation,'counts':dict(Counter(f"{r['split']}/{r['situation']}/{r['personality']}" for r in rows)),
+    report={'seed':a.seed,'total':len(rows),'ambient':a.ambient+a.extra_ambient,'conversation':a.conversation+a.extra_conversation,'voice':voice_hashes(),'counts':dict(Counter(f"{r['split']}/{r['situation']}/{r['personality']}" for r in rows)),
             'contractHash':digest(contract),'note':'AIContext has no app-category field. Category selects an event/app; no extra field is injected. Conversation is an explicit serialized EngineContext projection, requiring the documented app adapter.'}
     write_json(run/'report.json',report); logging.info('Created %d contexts (%d held out), %d situations',len(rows),sum(r['split']=='val' for r in rows),len(contract['lines']))
 

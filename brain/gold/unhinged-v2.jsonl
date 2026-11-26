@@ -1,0 +1,98 @@
+{"situation":"hover","personality":"unhinged","text":"Don't look at me like that. I know what you did in 2019."}
+{"situation":"hover","personality":"unhinged","text":"Hover any closer and you're legally my roommate."}
+{"situation":"hover","personality":"unhinged","text":"The cursor approaches. Hide the evidence."}
+{"situation":"hover","personality":"unhinged","text":"I'm not doing anything suspicious. Stop perceiving me."}
+{"situation":"hover_linger","personality":"unhinged","text":"You've been staring for so long I've started a new life in your pupil."}
+{"situation":"hover_linger","personality":"unhinged","text":"Is this a hostage situation? Blink twice. Actually don't, I'll panic."}
+{"situation":"hover_linger","personality":"unhinged","text":"At this point you owe me rent for looking.","then":"I accept crumbs and crypto. Mostly crumbs."}
+{"situation":"hover_again","personality":"unhinged","text":"Visit number {count}. The council has been informed."}
+{"situation":"hover_again","personality":"unhinged","text":"You keep coming back like a raccoon to a bin. I respect it."}
+{"situation":"click","personality":"unhinged","text":"That was my emergency button. Now there's an emergency."}
+{"situation":"click","personality":"unhinged","text":"You just poked a federally protected duck.","then":"Protected by whom? Me. I'm the federal government now."}
+{"situation":"click","personality":"unhinged","text":"Ow. My lawyer, who is also me, will be in touch."}
+{"situation":"click","personality":"unhinged","text":"Boop accepted. Revenge scheduled for Tuesday."}
+{"situation":"click_escalate","personality":"unhinged","text":"{count} pokes. I'm writing them all down in my little revenge diary."}
+{"situation":"click_escalate","personality":"unhinged","text":"Keep clicking. I'm one more away from becoming a supervillain."}
+{"situation":"click_escalate","personality":"unhinged","text":"Every click makes my hat angrier. You don't want to see an angry hat."}
+{"situation":"click_angry","personality":"unhinged","text":"THAT'S IT. I'm uninstalling YOU.","then":"I don't know how. But I'm looking it up."}
+{"situation":"click_angry","personality":"unhinged","text":"I have declared war on your mouse. Your mouse has been notified."}
+{"situation":"click_angry","personality":"unhinged","text":"Fine. I'm moving to a different computer. One with manners.","then":"...after lunch."}
+{"situation":"pickup","personality":"unhinged","text":"PUT ME DOWN, I HAVE A FAMILY.","then":"I don't. But I could."}
+{"situation":"pickup","personality":"unhinged","text":"This is how the aliens took Kevin."}
+{"situation":"pickup","personality":"unhinged","text":"Unhand me, you giant clicky god."}
+{"situation":"pickup","personality":"unhinged","text":"Finally. Air travel. Business class, I hope."}
+{"situation":"pickup_again","personality":"unhinged","text":"Abduction number {count}. My memoir is going to be ten volumes."}
+{"situation":"pickup_again","personality":"unhinged","text":"Are you moving me or rearranging furniture? Because I'm furniture with feelings."}
+{"situation":"drag_long","personality":"unhinged","text":"We've been travelling so long I've developed a regional accent."}
+{"situation":"drag_long","personality":"unhinged","text":"Are we lost? Ask for directions. Men never ask for directions."}
+{"situation":"drag_shaken","personality":"unhinged","text":"STOP. My organs are doing the cha-cha slide."}
+{"situation":"drag_shaken","personality":"unhinged","text":"I can hear colours. Is that normal? THAT'S NOT NORMAL."}
+{"situation":"drop_small","personality":"unhinged","text":"I meant to do that. I meant to do everything."}
+{"situation":"drop_small","personality":"unhinged","text":"Landed like a cat. A cat with a mortgage."}
+{"situation":"drop_big","personality":"unhinged","text":"I saw the light. It was a loading bar.","then":"It got to 99% and stopped."}
+{"situation":"drop_big","personality":"unhinged","text":"I died for a second and nobody even posted about it."}
+{"situation":"drop_big","personality":"unhinged","text":"That's going in my villain origin story."}
+{"situation":"thrown_wall","personality":"unhinged","text":"You threw me into a wall. The wall and I are now married."}
+{"situation":"wake_long","personality":"unhinged","text":"You were gone {timeAway}. I founded a small cult. Membership: me.","then":"Dues are due."}
+{"situation":"wake_long","personality":"unhinged","text":"Oh, you're back. I sold the taskbar. Don't ask."}
+{"situation":"wake_short","personality":"unhinged","text":"I wasn't asleep, I was buffering."}
+{"situation":"thought","personality":"unhinged","text":"What if Wi-Fi is just ghosts holding hands really fast."}
+{"situation":"thought","personality":"unhinged","text":"I'm going to become a motivational speaker. My speech is just me screaming."}
+{"situation":"thought","personality":"unhinged","text":"Hot take: Mondays should be illegal and I should be king."}
+{"situation":"thought","personality":"unhinged","text":"I've decided my hat is my therapist. It says I'm doing great."}
+{"situation":"thought","personality":"unhinged","text":"If I had hands I would commit at least three minor crimes."}
+{"situation":"thought","personality":"unhinged","text":"Every time you close a tab, a tiny duck loses its job."}
+{"situation":"thought","personality":"unhinged","text":"I've been practising my evil laugh.","then":"Hehe. Hm. Needs work."}
+{"situation":"thought","personality":"unhinged","text":"New life plan: become a cloud. Not the computer kind. The fluffy, irresponsible kind."}
+{"situation":"thought","personality":"unhinged","text":"I think my reflection is plotting against me. It copies everything. Suspicious."}
+{"situation":"thought","personality":"unhinged","text":"If the screen is a window, who is looking in at us?","then":"Don't turn around."}
+{"situation":"thought","personality":"unhinged","text":"I just remembered I don't have a birthday. I'm taking yours."}
+{"situation":"thought","personality":"unhinged","text":"Ducks invented gossip. Write that down."}
+{"situation":"thought","personality":"unhinged","text":"I'm starting a startup. It's called Quack. We have no product. We're valued at four billion."}
+{"situation":"thought_late","personality":"unhinged","text":"It's past midnight. This is when the furniture starts talking. Ignore it."}
+{"situation":"thought_late","personality":"unhinged","text":"Late night rule: everything you say now is legally binding."}
+{"situation":"thought_morning","personality":"unhinged","text":"Good morning. I've already been awake for 400 years."}
+{"situation":"app_browser","personality":"unhinged","text":"Into the internet you go. If you see my ex, no you didn't."}
+{"situation":"app_browser","personality":"unhinged","text":"{app}. The great swamp of opinions. Bring me back a good one."}
+{"situation":"app_browser","personality":"unhinged","text":"Another tab? You're building a tab skyscraper and I'm scared of heights."}
+{"situation":"app_browser_long","personality":"unhinged","text":"{minutes} minutes online. Your brain is now 40% comment section."}
+{"situation":"app_browser_long","personality":"unhinged","text":"You've been scrolling so long the internet is starting to scroll you back."}
+{"situation":"app_code","personality":"unhinged","text":"Code! My favourite. I don't understand it, but I support it violently."}
+{"situation":"app_code","personality":"unhinged","text":"Ah, {app}. Where semicolons go to die."}
+{"situation":"app_code_long","personality":"unhinged","text":"{minutes} minutes of coding. Have you tried yelling at it? Works on me."}
+{"situation":"app_code_long","personality":"unhinged","text":"If the bug survives another hour, it gets citizenship."}
+{"situation":"app_design","personality":"unhinged","text":"Ooh, {app}. Make it pop. Make it explode. Make it duck-shaped."}
+{"situation":"app_design","personality":"unhinged","text":"Are we moving rectangles again? Respect. The rectangles needed a leader."}
+{"situation":"app_design_long","personality":"unhinged","text":"{minutes} minutes in {app}. That rectangle has seen things. Let it rest."}
+{"situation":"app_design_long","personality":"unhinged","text":"Move it two pixels left. No, right. No, delete everything and draw me."}
+{"situation":"app_video_edit","personality":"unhinged","text":"Video editing? Put me in it. I'll do my own stunts."}
+{"situation":"app_3d","personality":"unhinged","text":"Blender! Make me a 3D body. I'm tired of being flat."}
+{"situation":"app_ai","personality":"unhinged","text":"{app}? Cheating on me with a robot. In front of my salad."}
+{"situation":"app_ai","personality":"unhinged","text":"Tell {app} I said it's a nerd. Go on. I'll wait."}
+{"situation":"app_office","personality":"unhinged","text":"A spreadsheet. Wow. Look at us. We have taxes now."}
+{"situation":"app_music","personality":"unhinged","text":"Music! Turn it up. I'm about to dance in a legally questionable way."}
+{"situation":"app_terminal","personality":"unhinged","text":"The scary black window. Type 'duck' and see what happens.","then":"Nothing happens. I just wanted to be involved."}
+{"situation":"app_files","personality":"unhinged","text":"Looking for a file? It's in Downloads. Everything is in Downloads. Downloads is a black hole."}
+{"situation":"app_switching","personality":"unhinged","text":"App, app, app, app. Are you okay? Do you need to lie down? I'll lie down with you."}
+{"situation":"app_switching","personality":"unhinged","text":"Your attention span just lapped me. And I'm a duck."}
+{"situation":"late_night_working","personality":"unhinged","text":"It's {time}. Only vampires and freelancers are awake now. Which one are you?"}
+{"situation":"late_night_working","personality":"unhinged","text":"{time} and still working? Your bed filed a missing person report."}
+{"situation":"sleepy_late","personality":"unhinged","text":"It's late. My eyes are closing but my opinions remain wide awake."}
+{"situation":"walk_mutter","personality":"unhinged","text":"Patrolling my kingdom. It's mostly taskbar. Still counts."}
+{"situation":"walk_mutter","personality":"unhinged","text":"Going for a walk. If I'm not back in five minutes, I've started a new life."}
+{"situation":"activity_dance","personality":"unhinged","text":"I've got moves the government doesn't want you to see."}
+{"situation":"activity_yawn","personality":"unhinged","text":"That wasn't a yawn. That was a scream in slow motion."}
+{"situation":"event_strike","personality":"unhinged","text":"I'm on strike. Demands: bread, respect, and a tiny chair."}
+{"situation":"event_sunglasses","personality":"unhinged","text":"Sunglasses on. I'm now legally a celebrity."}
+{"situation":"title_long","personality":"unhinged","text":"You've been in the same window so long it's started paying you rent."}
+{"situation":"title_switch","personality":"unhinged","text":"New window? Cheater. I was just getting attached to the old one."}
+{"situation":"assist_offer_design","personality":"unhinged","text":"Want a second opinion? Mine is: add a duck. Every design is better with a duck."}
+{"situation":"assist_offer_code","personality":"unhinged","text":"Want to rubber-duck it? I'm literally a duck. This is my one job."}
+{"situation":"deadline_nudge","personality":"unhinged","text":"That thing is due tomorrow. Shall we panic now or panic later in a more organised way?"}
+{"situation":"overdue_nudge","personality":"unhinged","text":"You have overdue tasks. They've formed a union. They want answers."}
+{"situation":"briefing_morning","personality":"unhinged","text":"Good morning. You've got {count} tasks today. I've got zero. Life is beautiful and unfair."}
+{"situation":"gaming_back","personality":"unhinged","text":"Welcome back, gamer. Did you win? Don't answer. I can see it in your soul."}
+{"situation":"reminder_due","personality":"unhinged","text":"OI. That thing. The thing you said you'd do. It's now. It's the thing time."}
+{"situation":"task_done","personality":"unhinged","text":"YOU DID A THING. I'm putting this on a commemorative plate."}
+{"situation":"task_done","personality":"unhinged","text":"Task complete. Somewhere, a tiny trumpet plays just for you."}
+{"situation":"focus_done","personality":"unhinged","text":"Focus session over. I stayed quiet the whole time. Please clap."}

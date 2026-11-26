@@ -9,7 +9,7 @@ from pathlib import Path
 import random
 import statistics
 import time
-from common import ROOT, append_jsonl, atomic_text, digest, file_hash, load_contract, logging_run, manifest, messages_for, ollama_chat, read_jsonl, schema_for, write_json
+from common import ROOT, append_jsonl, atomic_text, digest, dumps, file_hash, load_contract, logging_run, manifest, messages_for, ollama_chat, read_jsonl, schema_for, write_json
 from validation import Validator, beats, generic_count, output_text
 
 def metrics(rows):
@@ -24,7 +24,57 @@ def metrics(rows):
             'generic_phrase_rate_pct':100*sum(generic_count(s)>0 for s in lines)/max(1,len(lines)),
             'errors':sum('error' in r for r in rows),'rejections':dict(Counter(r.get('rejection') for r in rows if r.get('rejection')))}
 
-def report(run,results,seed):
+def humour_report(results, scores, seed):
+    lookup={(r['arm'],r['id']):r for r in scores}; groups=defaultdict(list)
+    held=[r for r in results if r['suite']=='heldout']
+    for r in held: groups[(r['arm'],r['personality'])].append(r)
+    summary={}; md=['\n## Humour',
+        'Local qwen3:14b, fixed rubric and three calibrations. Means include invalid/silent/transport outputs at score 1; missing judge calls remain pending and are never silently excluded. Compare matching prompt modes. These are automated preference estimates, not human ratings.',
+        '| Arm | Personality | Scored / Total | Mean / 10 |','|---|---|---:|---:|']
+    for (arm,p),rows in sorted(groups.items()):
+        values=[lookup[(r['arm'],r['id'])]['score'] for r in rows if (r['arm'],r['id']) in lookup]
+        mean=statistics.mean(values) if len(values)==len(rows) else None
+        summary[arm+'/'+p]={'scored':len(values),'total':len(rows),'mean':mean}
+        md.append(f"| {arm} | {p} | {len(values)} / {len(rows)} | "+(f'{mean:.2f}' if mean is not None else 'pending')+' |')
+    pairs=defaultdict(dict)
+    for r in held:
+        if r['personality']=='unhinged': pairs[r['id']][r['arm']]=r
+    keys=sorted(pairs); random.Random(seed).shuffle(keys); arms=sorted({r['arm'] for r in held})
+    def cell(r):
+        if r is None: return 'pending'
+        score=lookup.get((r['arm'],r['id']),{}).get('score','pending')
+        text=' / '.join(r.get('lines',[])) or r.get('error') or r.get('raw') or '[silence]'
+        return (str(text).replace('|','\\|').replace('\n','<br>')+f' (score {score})')
+    md += [f'\n### {min(30,len(keys))} random paired unhinged contexts',
+           'Same held-out inputs for every model; failures and silence are retained. Seed: '+str(seed)+'.',
+           '| Context | '+' | '.join(arms)+' |','|---|'+'---|'*len(arms)]
+    for key in keys[:30]:
+        first=next(iter(pairs[key].values()))
+        context=first.get('prompt',key).replace('|','\\|').replace('\n',' ')
+        md.append('| '+context+' | '+' | '.join(cell(pairs[key].get(arm)) for arm in arms)+' |')
+    return md,summary
+
+def score_humour(run, results, contexts, contract, port, timeout):
+    from judge import HumourJudge
+    judge=HumourJudge(run/'humour-cache.jsonl',contract,port,timeout)
+    path=run/'humour.jsonl'; scores=read_jsonl(path,recover_tail=True)
+    done={(r['arm'],r['id']) for r in scores}; mapping={r['id']:r for r in contexts}; failures=[]
+    for i,result in enumerate(results):
+        if result['suite']!='heldout' or (result['arm'],result['id']) in done: continue
+        try:
+            if not result.get('value') or not result.get('lines'):
+                value={'score':1,'reason':'Invalid, silent or failed model response.'}
+            else:
+                value=judge.score(mapping[result['id']],[{'candidate':0,'value':result['value']}])[0]
+            record={'id':result['id'],'arm':result['arm'],'score':value['score'],'reason':value['reason'],'judge':judge.version}
+            append_jsonl(path,record); scores.append(record)
+        except Exception as e:
+            failures.append({'id':result['id'],'arm':result['arm'],'error':str(e)})
+        if (i+1)%10==0: logging.info('Humour scoring %d/%d',i+1,len(results))
+    write_json(run/'humour-errors.json',failures)
+    return failures
+
+def report(run,results,seed,humour=False):
     by_arm=defaultdict(list)
     for r in results: by_arm[r['arm']].append(r)
     summary={arm:metrics(rows) for arm,rows in by_arm.items()}; write_json(run/'summary.json',summary)
@@ -56,12 +106,16 @@ def report(run,results,seed):
     for key in keys[:40]:
         md+=['\n### '+key]
         for arm,r in pairs[key].items(): md += [f"- **{arm}**: "+(' / '.join(r.get('lines',[])) or r.get('raw','')[:200]).replace('\n',' ↵ ')]
+    if humour:
+        section,humour_summary=humour_report(results,read_jsonl(run/'humour.jsonl'),seed)
+        md+=section; write_json(run/'humour-summary.json',humour_summary)
     atomic_text(run/'report.md','\n'.join(md)+'\n')
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--heldout',type=Path,default=ROOT/'data/heldout.jsonl'); p.add_argument('--bakeoff',type=Path,default=ROOT/'data/bakeoff.jsonl'); p.add_argument('--contract',type=Path,default=ROOT/'data/app_contract.json')
-    p.add_argument('--candidate',default='ducky:4b'); p.add_argument('--baseline',default='qwen3:8b'); p.add_argument('--run-dir',type=Path,help='Reuse to resume results without repeating completed calls')
+    p.add_argument('--heldout',type=Path,default=ROOT/'data/round2/heldout.jsonl'); p.add_argument('--bakeoff',type=Path,default=ROOT/'data/round2/bakeoff.jsonl'); p.add_argument('--contract',type=Path,default=ROOT/'data/round2/app_contract.json')
+    p.add_argument('--candidate',default='ducky:4b-v2'); p.add_argument('--baseline',default='ducky:4b-v1'); p.add_argument('--run-dir',type=Path,help='Reuse to resume results without repeating completed calls')
+    p.add_argument('--humour',action='store_true',help='Score heldout outputs and compare v1/v2 with identical short/app prompt modes')
     p.add_argument('--port',type=int,default=11434); p.add_argument('--timeout',type=float,default=180); p.add_argument('--seed',type=int,default=42)
     p.add_argument('--limit',type=int,default=0,help='Smoke-test contexts; zero uses all'); p.add_argument('--skip-native-arm',action='store_true')
     p.add_argument('--dry-run',action='store_true'); p.add_argument('--report-only',action='store_true'); a=p.parse_args(); run=logging_run('eval',a.run_dir)
@@ -71,12 +125,17 @@ def main():
     if a.limit: contexts=contexts[:a.limit]
     arms=[(a.candidate,'short'),(a.baseline,'app')]
     if not a.skip_native_arm: arms.insert(1,(a.candidate,'app'))
+    if a.humour:
+        arms=[(model,mode) for mode in (['short'] if a.skip_native_arm else ['short','app']) for model in (a.baseline,a.candidate)]
+        from judge import HumourJudge
+        judge_version=HumourJudge(run/'humour-cache.jsonl',contract,a.port,a.timeout).version
     config={'heldout':file_hash(a.heldout),'bakeoff':file_hash(a.bakeoff),'contract':digest(contract),'arms':arms,'seed':a.seed,'limit':a.limit,
+            'humour':a.humour,'judge':judge_version if a.humour else None,
             'code':file_hash(__file__),'commonCode':file_hash(Path(__file__).with_name('common.py')),'validatorCode':file_hash(Path(__file__).with_name('validation.py'))}
     # JSON-normalize tuples before comparing manifests on resume.
     config=json.loads(json.dumps(config)); manifest(run/'config.json',config)
     results=read_jsonl(run/'results.jsonl',recover_tail=True)
-    if a.report_only: report(run,results,a.seed); return
+    if a.report_only: report(run,results,a.seed,a.humour); return
     if a.dry_run:
         write_json(run/'request-preview.json',[{'arm':model+'/'+mode,'messages':messages_for(contexts[0],contract,mode),'schema':schema_for(contexts[0],contract)} for model,mode in arms]); return
     done={(r['arm'],r['id']):r for r in results}
@@ -92,6 +151,7 @@ def main():
             if (arm,row['id']) in done:
                 recent.extend(done[(arm,row['id'])].get('lines',[]) if row['kind']=='ambient' else []); continue
             result={'id':row['id'],'arm':arm,'model':model,'mode':mode,'kind':row['kind'],'situation':row['situation'],'personality':row['personality'],'suite':row['suite'],
+                    'prompt':row['context']['turns'][-1]['text'] if row['kind']=='conversation' else dumps(row['context']),
                     'json_valid':False,'validator_pass':False,'strict_pass':False,'lines':[],'latency_ms':None}
             start=time.perf_counter()
             try:
@@ -108,7 +168,11 @@ def main():
             except Exception as e: result.update(error=type(e).__name__+': '+str(e),rejection='transport',latency_ms=(time.perf_counter()-start)*1000)
             append_jsonl(run/'results.jsonl',result); results.append(result)
             if (i+1)%10==0: logging.info('%s %d/%d',arm,i+1,len(contexts)); report(run,results,a.seed)
-        report(run,results,a.seed)
+        report(run,results,a.seed,a.humour)
+    if a.humour:
+        failures=score_humour(run,results,contexts,contract,a.port,a.timeout)
+        report(run,results,a.seed,True)
+        if failures: raise SystemExit('Humour judging incomplete; rerun same command to retry pending scores')
     logging.info('Report: %s',run/'report.md')
 
 if __name__=='__main__': main()

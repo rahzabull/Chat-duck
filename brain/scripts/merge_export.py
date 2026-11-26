@@ -31,7 +31,8 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--adapter',type=Path,help='runs/train/<timestamp>/adapter; required for merge')
     p.add_argument('--base',type=Path,default=ROOT/'models/Qwen3-4B-Instruct-2507')
-    p.add_argument('--output',type=Path,default=ROOT/'export/ducky-4b-merged')
+    p.add_argument('--output',type=Path,default=ROOT/'export/round2/ducky-4b-v2-merged')
+    p.add_argument('--model-tag',default='ducky:4b-v2')
     p.add_argument('--device',choices=['cpu','cuda'],default='cpu',help='CPU default needs roughly 20-30 GB free RAM; CUDA uses the GPU')
     p.add_argument('--prepare-only',action='store_true',help='Verify tokenizer and write Modelfile only; no model load')
     a=p.parse_args(); run=logging_run('merge_export')
@@ -58,7 +59,7 @@ def main():
         import torch
         from transformers import AutoModelForCausalLM
         from peft import PeftModel
-        base=AutoModelForCausalLM.from_pretrained(a.base,local_files_only=True,trust_remote_code=False,dtype=torch.bfloat16,attn_implementation='sdpa',device_map={'':a.device})
+        base=AutoModelForCausalLM.from_pretrained(a.base,local_files_only=True,trust_remote_code=False,torch_dtype=torch.bfloat16,attn_implementation='sdpa',device_map={'':a.device})
         model=PeftModel.from_pretrained(base,a.adapter,local_files_only=True,is_trainable=False)
         merged=model.merge_and_unload(safe_merge=True); merged.to(dtype=torch.bfloat16)
         merged.save_pretrained(stage,safe_serialization=True,max_shard_size='4GB'); tokenizer.save_pretrained(stage)
@@ -68,7 +69,7 @@ def main():
         if any(not (stage/s).is_file() or (stage/s).stat().st_size==0 for s in shards): raise RuntimeError('Incomplete merged shards')
         write_json(stage/'export_manifest.json',config); stage.rename(model_dir)
         logging.info('Merged bf16 weights: %s',model_dir)
-    command='ollama create ducky:4b -q q4_K_M -f Modelfile'
+    command=f'ollama create {a.model_tag} -q q4_K_M -f Modelfile'
     atomic_text(export/'create-command.txt',f'Run in {export}\n{command}\n')
     print(f'\nRun from: {export}\n{command}')
 

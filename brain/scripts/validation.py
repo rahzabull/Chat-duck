@@ -72,6 +72,9 @@ class Validator:
         self.public_words=words(corpus)|self.ordinary|self.topics|set('python javascript typescript html css sql json api utc iso true false none earth sun moon monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december first second third fourth step example return input output result note tip option idea summary because although while try start begin choose check sort count reverse remove define function const let var class print list set dict array map number string boolean use here sure absolutely certainly sorry unfortunately maybe yes no consider write keep divide multiply subtract add imagine focus take aim break avoid remember delete next finally however otherwise for if else def import from with except raise assert lambda'.split())
         from make_contexts import prompt_bank, APPS
         self.public_words |= words(dumps(prompt_bank())) | words(dumps(APPS))
+        # Authored v2 vocabulary is allowed, without weakening the app validator.
+        from voice import gold_rows, TOPIC_SEEDS
+        self.public_words |= words(dumps(gold_rows())) | words(dumps(TOPIC_SEEDS))
         self.person_names=re.compile(r'\b(?:alice|bob|charlie|david|emma|john|jane|mary|michael|rahul|priya|sarah|smith|doe)\b',re.I)
 
     def personal_data(self,value):

@@ -10,6 +10,29 @@ from pathlib import Path
 from common import ROOT, append_jsonl, file_hash, logging_run, manifest, read_jsonl, write_json
 
 TARGETS=['q_proj','k_proj','v_proj','o_proj','gate_proj','up_proj','down_proj']
+REPAIR_COMMAND = ('uv pip install --python .venv\\Scripts\\python.exe --upgrade '
+    '"transformers==4.57.6" "tokenizers==0.22.2" "huggingface-hub==0.36.2" '
+    '"datasets==4.4.1" "peft==0.18.0" "accelerate==1.16.0"')
+
+def check_dependencies():
+    """CPU-only import/API check; intentionally no installations or GPU access."""
+    import importlib.metadata as metadata
+    versions={p:metadata.version(p) for p in ('torch','transformers','tokenizers','huggingface-hub','datasets','peft','accelerate')}
+    try:
+        from transformers import Trainer, TrainingArguments, AutoModelForCausalLM
+        from datasets import Dataset
+        from peft import LoraConfig, get_peft_model
+        import inspect
+        if 'processing_class' not in inspect.signature(Trainer.__init__).parameters:
+            raise RuntimeError('Trainer lacks processing_class')
+        if 'eval_strategy' not in inspect.signature(TrainingArguments).parameters:
+            raise RuntimeError('TrainingArguments lacks eval_strategy')
+    except (ImportError, RuntimeError) as e:
+        raise RuntimeError(f'Training dependency preflight failed: {e}\nInstalled: {versions}\n'
+            f'Claude: run this repair with network access, then rerun --check-deps:\n{REPAIR_COMMAND}\n'
+            'TRL is not used by this pipeline; remove the unused trl 1.19.0 with '
+            'uv pip uninstall --python .venv\\Scripts\\python.exe trl, then run uv pip check --python .venv\\Scripts\\python.exe. Keep the installed CUDA torch.') from e
+    return versions
 
 def encode_example(tokenizer,messages,max_length):
     if [m['role'] for m in messages]!=['system','user','assistant']: raise ValueError('Expected one system/user/assistant training turn')
@@ -32,12 +55,17 @@ class CompletionCollator:
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--base',type=Path,default=ROOT/'models/Qwen3-4B-Instruct-2507'); p.add_argument('--train',type=Path,default=ROOT/'data/train.jsonl'); p.add_argument('--val',type=Path,default=ROOT/'data/val.jsonl')
+    p.add_argument('--base',type=Path,default=ROOT/'models/Qwen3-4B-Instruct-2507'); p.add_argument('--train',type=Path,default=ROOT/'data/round2/train.jsonl'); p.add_argument('--val',type=Path,default=ROOT/'data/round2/val.jsonl')
     p.add_argument('--run-dir',type=Path,help='Reuse this directory to resume its latest complete checkpoint; completed runs no-op')
-    p.add_argument('--batch-size',type=int,default=2); p.add_argument('--effective-batch',type=int,default=32); p.add_argument('--epochs',type=float,default=2)
+    p.add_argument('--batch-size',type=int,default=2); p.add_argument('--effective-batch',type=int,default=32); p.add_argument('--epochs',type=float,default=3)
     p.add_argument('--max-length',type=int,default=768); p.add_argument('--lr',type=float,default=2e-4); p.add_argument('--seed',type=int,default=42)
     p.add_argument('--prepare-only',action='store_true',help='CPU tokenization/mask audit only; no model or CUDA load')
+    p.add_argument('--check-deps',action='store_true',help='CPU-only training dependency preflight; no model load')
     a=p.parse_args(); run=logging_run('train',a.run_dir)
+    if a.check_deps:
+        versions=check_dependencies(); write_json(run/'dependencies.json',versions); logging.info('Dependencies: %s',versions); return
+    if a.base.resolve()!=(ROOT/'models/Qwen3-4B-Instruct-2507').resolve() or (a.base/'adapter_config.json').exists():
+        p.error('Round two must start from the local original Qwen3-4B-Instruct-2507 base, never v1 or a merged model')
     if a.batch_size<1 or a.effective_batch%a.batch_size or a.epochs<=0: p.error('Effective batch must be divisible by positive microbatch; epochs must be positive')
     from transformers import AutoTokenizer
     tokenizer=AutoTokenizer.from_pretrained(a.base,local_files_only=True,trust_remote_code=False)
@@ -62,6 +90,7 @@ def main():
     write_jsonl(run/'overlength.jsonl',rejected)
     logging.info('Tokenization: %s',stats)
     if a.prepare_only: return
+    write_json(run/'dependencies.json',check_dependencies())
     import torch
     from datasets import Dataset
     from transformers import AutoModelForCausalLM, Trainer, TrainerCallback, TrainingArguments, set_seed
@@ -69,7 +98,7 @@ def main():
     if not torch.cuda.is_available() or not torch.cuda.is_bf16_supported(): raise RuntimeError('A CUDA GPU with bf16 is required. CPU training is intentionally disabled.')
     if int(os.environ.get('WORLD_SIZE','1'))!=1: raise RuntimeError('This runbook supports one Windows GPU; effective batch assumes world_size=1')
     set_seed(a.seed)
-    model=AutoModelForCausalLM.from_pretrained(a.base,local_files_only=True,trust_remote_code=False,dtype=torch.bfloat16,attn_implementation='sdpa')
+    model=AutoModelForCausalLM.from_pretrained(a.base,local_files_only=True,trust_remote_code=False,torch_dtype=torch.bfloat16,attn_implementation='sdpa')
     model.config.use_cache=False
     model=get_peft_model(model,LoraConfig(r=16,lora_alpha=32,lora_dropout=.05,target_modules=TARGETS,bias='none',task_type='CAUSAL_LM'))
     model.enable_input_require_grads(); model.print_trainable_parameters()
