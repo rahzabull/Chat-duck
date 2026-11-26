@@ -1,5 +1,49 @@
 # Ducky architecture (Milestones 1–3 and Expansion Phases A–C)
 
+## Milestone 6: ambient cadence and optional observation pipeline
+
+The single timing table is src/core/dialogue/cadence.ts. Personality/emotion scales
+thought intervals inside the requested bounds. Won't shut up uses the existing
+2-second behaviour tick to choose a thought, mood mutter or small activity line,
+with app/title follow-ups at their own bounded intervals. Accepted ambient AI
+silence/errors use the already selected authored line; screen observations have
+no fallback. Director templates and AI similarity checks both retain 30 lines.
+Existing interaction memories and task thoughts remain available.
+
+TitleActivity owns one safe summary, dwell thresholds and two minutes of app
+transitions. AppAwareness runs one hidden resident PowerShell/C# helper. It omits
+GetWindowTextW entirely unless title or effective screen permission is enabled;
+process/self/user exclusions run before title reads, and private-site filtering
+runs before stdout. Base64 only frames UTF-8 titles over the pipe; main sanitizes
+them immediately. The sample command wakes an AutoResetEvent instead of launching
+a second helper or adding a polling loop. Privacy/DND/focus/conversation use the
+identity-free geometry variant. No title or HWND is published in CompanionState.
+
+ScreenAwareness is driven by existing ticks, with a debounced change deadline and
+a periodic deadline. Successful delivery establishes the unchanged-frame baseline; cold/failed observations can retry at the next scheduled sample. It has a single in-flight lock, abort/epoch checks, and a
+640-byte grayscale hash. Fresh permitted foreground samples surround a resident
+helper `capture <hwnd> <maxW> <maxH>` request. The helper rechecks the exact HWND,
+foreground/minimized/fullscreen state, own processes and private exe/title filters
+before `PrintWindow` renders that one window. JPEG encoding and aspect-preserving
+downscaling happen in memory, with a 400 KB output cap; no window enumeration or
+desktop fallback exists. Main decodes the JPEG for a 32×20 hash and blank-frame
+rejection. Timeout retires the helper pipe to prevent stale reply association.
+See privacy.md for foreground-switch races and capture lifetime.
+
+Capture -> fixed vision prompt + JPEG -> structured neutral description ->
+HybridBrain prompt with permitted app/title + character state -> existing JSON,
+content, observation-leak and repetition validation -> SpeechQueue -> bubble.
+
+The image is released after its request; the description exists only for this
+pipeline. There is no path from either to conversation, settings or memory stores.
+An eight-second deadline includes capture and both requests. Privacy/permission,
+mode, window/title changes and user silence abort or invalidate in-flight work.
+Only the main process's fixed-loopback provider performs requests. No renderer
+network access, new dependency, capture timer when off, or vision-driven movement.
+The eye badge consumes permission/capture-revision metadata only; it and the tray
+stop label use the existing validated settings IPC to revoke screen permission.
+
+
 ## Expansion Phase B: productivity
 
 `core/productivity/parse.ts` uses the already installed chrono-node 2.10.3. It runs
@@ -294,8 +338,8 @@ Interaction / ambient timer / permitted app sample (MAIN)
        allowlisted context + 4–6 same-situation examples + last 8 spoken beats
        -> MAIN fetch -> http://127.0.0.1:<numeric port>/api/chat
        -> 2.5-second deadline / cancellation / generation + situation recheck
-       -> JSON and text validator, repetition against last 20 displayed beats
-       -> shouldSpeak:false: silence
+       -> JSON and text validator, repetition against last 30 displayed beats
+       -> shouldSpeak:false: authored fallback for scheduled ambient slots; otherwise silence
        -> invalid/error/timeout: curated fallback (only while still valid)
        -> valid: speech + allowed emotion/animation
        -> SpeechQueue recheck -> renderer bubble text / adapter

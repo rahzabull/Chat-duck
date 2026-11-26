@@ -35,6 +35,7 @@ export class DuckyTray {
         { label: 'Until I turn it off', click: () => this.command('dnd-until-off') },
         { label: 'Turn off', enabled: state.dnd, click: () => this.command('dnd-off') },
       ] },
+      ...(state.screenAwarenessActive ? [{ label: 'Ducky can see your window (click to stop)', click: () => this.settings({ screenAwareness: false }) }] : []),
       { label: 'Privacy mode', type: 'checkbox', checked: state.settings.privacyMode, click: () => this.command('privacy') },
       { label: 'Skill pack', submenu: SKILL_PACK_IDS.map(id => ({ label: SKILL_PACKS[id].label, type: 'radio' as const, checked: state.settings.skillPack === id, click: () => this.settings({ skillPack: id }) })) },
       { label: 'Talk to Ducky', click: () => this.command('talk') },

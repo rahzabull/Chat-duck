@@ -10,6 +10,34 @@ function fakeChild() {
 }
 afterEach(() => vi.useRealTimers());
 describe('foreground helper lifecycle', () => {
+  it('sanitizes the optional bounded title protocol and never forwards private/self titles', () => {
+    const child = fakeChild(), sample = vi.fn();
+    const helper = new AppAwareness(sample, vi.fn(), () => [], vi.fn(() => child) as unknown as typeof spawn);
+    helper.configure(true, true, true);
+    const encode = (title: string) => Buffer.from(title).toString('base64');
+    child.stdout.write(`chrome.exe|0|42|${encode('lofi beats - YouTube')}\n`);
+    expect(sample).toHaveBeenLastCalledWith({ app: { name: 'Chrome', category: 'browser' }, fullscreen: false, hwnd: '42', safeTitle: 'YouTube: lofi beats - YouTube' });
+    child.stdout.write(`chrome.exe|0|42|${encode('Gmail')}\n`);
+    expect(sample).toHaveBeenLastCalledWith({ app: null, fullscreen: false, private: true });
+    child.stdout.write(`private|0|42|${encode('never expose this')}\n`);
+    expect(sample).toHaveBeenLastCalledWith({ app: null, fullscreen: false, private: true });
+    child.stdout.write(`self|0|42|${encode('never expose this')}\n`);
+    expect(sample).toHaveBeenLastCalledWith({ app: null, fullscreen: false });
+    const count = sample.mock.calls.length;
+    child.stdout.write('chrome.exe|0|oops|abcd\nchrome.exe|0|42|not base64!\n');
+    expect(sample).toHaveBeenCalledTimes(count);
+    expect(JSON.stringify(sample.mock.calls)).not.toContain('never expose');
+    helper.dispose(); child.emit('close');
+  });
+  it('wakes the resident helper for a fresh capture gate and cancels that wait on revocation', async () => {
+    vi.useFakeTimers(); const child = fakeChild();
+    const helper = new AppAwareness(vi.fn(), vi.fn(), () => [], vi.fn(() => child) as unknown as typeof spawn);
+    helper.configure(true, true, false, true);
+    const first = helper.sampleFresh(); expect(child.stdin.read()?.toString()).toBe('sample\n');
+    child.stdout.write('chrome.exe|0|42|\n'); expect((await first)?.hwnd).toBe('42');
+    const pending = helper.sampleFresh(); helper.configure(false);
+    expect(await pending).toBeUndefined(); expect(vi.getTimerCount()).toBe(0); child.emit('close');
+  });
   it('captures synchronously even with awareness disabled and never uses a sampled handle', () => {
     const child = fakeChild(); const run = vi.fn().mockReturnValue('222');
     const focus = new ForegroundFocus(run as unknown as typeof execFileSync, 'win32');
@@ -87,7 +115,7 @@ describe('foreground helper lifecycle', () => {
     const script = awarenessScript(123, [456]);
     for (const api of ['GetForegroundWindow', 'GetWindowThreadProcessId', 'QueryFullProcessImageName', 'MonitorFromWindow', 'GetMonitorInfo', 'WaitForSingleObject']) expect(script).toContain(api);
     for (const forbidden of ['GetWindowText', 'Get-Process', 'MainWindowTitle', 'CopyFromScreen', 'GetClipboardData']) expect(script).not.toContain(forbidden);
-    expect(script).toContain('OpenProcess(0x1000'); expect(script).toContain('Start-Sleep -Milliseconds 3000');
+    expect(script).toContain('OpenProcess(0x1000'); expect(script).toContain('Wake.WaitOne(3000)');
     expect(script).toContain('Array.IndexOf(own, pid)'); expect(script).toContain('return "private" + suffix');
   });
 });

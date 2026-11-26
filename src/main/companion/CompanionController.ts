@@ -1,3 +1,7 @@
+import { ScreenAwareness, captureWindow } from '../platform/screen-awareness';
+import { TitleActivity } from '../../core/awareness/title';
+import { TALK_CADENCE, between, ambientDelay } from '../../core/dialogue/cadence';
+import type { ForegroundSample } from '../../core/awareness';
 import { ModeResolver, resolveMode, dndActive, quietHours } from '../../core/modes';
 import { ProactiveScheduler, PROACTIVE_IDS, type Candidate, type ProactiveId } from '../../core/proactive';
 import { conversationLayout } from '../../core/conversation/layout';
@@ -10,7 +14,7 @@ import { freshMemory, memorySummary, remember, visit, type Memory } from '../../
 import { dailyMood, EmotionEngine, localDay } from '../../core/emotions';
 import { ACTIVITIES, ACTIVITY_DURATION, type Behaviour, BehaviourScheduler } from '../../core/behaviour';
 import { ANIMATION_IDS } from '../../animation/adapter';
-import { DialogueDirector, POLICIES, thoughtDelay, thoughtSituation, type DialogueContext, type DirectedSpeech, type Situation } from '../../core/dialogue';
+import { DialogueDirector, POLICIES, thoughtSituation, type DialogueContext, type DirectedSpeech, type Situation } from '../../core/dialogue';
 import { InteractionContext, landingSituation, type SituationEvent } from '../../core/dialogue/context';
 import { AppSessionTracker } from '../../core/awareness';
 import { EventBus } from '../../core/events';
@@ -22,7 +26,7 @@ import { CursorPoller } from '../platform/cursor';
 import { primaryArea, workAreas } from '../platform/displays';
 import type { SettingsStore } from '../settings/store';
 import { AppAwareness } from '../platform/awareness';
-import { HybridBrain, initialBrainState } from '../ai/HybridBrain';
+import { HybridBrain, initialBrainState, usesAI } from '../ai/HybridBrain';
 
 export class CompanionController {
   private modes = new ModeResolver();
@@ -63,6 +67,11 @@ export class CompanionController {
   private context = new InteractionContext();
   private sessions = new AppSessionTracker();
   private awareness: AppAwareness;
+  private titles = new TitleActivity();
+  private foreground: ForegroundSample = { app: null, fullscreen: false };
+  private vision: ScreenAwareness;
+  private nextFollow = 0;
+  private shortBreak = false;
   private nextThought = 0;
   private nextLate = 0;
   private fall?: { height: number; hitWall: boolean; touched?: boolean };
@@ -111,6 +120,19 @@ export class CompanionController {
     this.brain = new HybridBrain(brain => { this.state.brain = brain; this.publish(); }, undefined, aiModel => {
       this.store.update({ aiModel }); this.state.settings = this.store.value; this.publish();
     });
+    this.vision = new ScreenAwareness(() => ({ allowed: this.visionAllowed(), talk: this.store.value.talkativeness,
+      model: this.store.value.visionModel, sample: this.foreground, context: this.observationContext() }),
+      (jpeg, model, context, signal) => this.brain.observe(jpeg, model, context, signal),
+      line => this.dialogue.observeScreen(() => this.say(line), this.store.value.talkativeness),
+      () => { this.state.captureRevision = (this.state.captureRevision ?? 0) + 1; this.publish(); },
+      async sample => {
+        const fresh = await this.awareness.sampleFresh();
+        if (!this.visionAllowed() || !fresh?.app || fresh.private || fresh.fullscreen || fresh.hwnd !== sample.hwnd || fresh.safeTitle !== sample.safeTitle) return;
+        const frame = await captureWindow(fresh, (hwnd, maxW, maxH) => this.awareness.capture(hwnd, maxW, maxH));
+        const after = await this.awareness.sampleFresh();
+        if (!this.visionAllowed() || !after?.app || after.private || after.fullscreen || after.hwnd !== fresh.hwnd || after.safeTitle !== fresh.safeTitle) { if (frame) frame.jpeg = ''; return; }
+        return frame;
+      });
     const saved = store.value.position;
     this.body = saved && workAreas().some(area => contains(saved, area))
       ? createBody(clampPosition(saved, workAreas(), this.size())) : resetPosition(primaryArea(), this.size());
@@ -118,14 +140,20 @@ export class CompanionController {
     this.cursor = new CursorPoller(point => {
       if (this.ready && !window.isDestroyed()) window.webContents.send(CHANNELS.cursor, { cursor: point, origin: this.windowOrigin() });
     }, point => this.dragSample(point), () => ({ ...this.windowOrigin(), ...this.size() }));
-    this.nextThought = Date.now() + thoughtDelay(store.value.talkativeness) / this.emotions.speechScale();
+    this.nextThought = Date.now() + this.thoughtInterval();
     this.awareness = new AppAwareness(sample => {
       this.fullscreenKnown = true;
       const fullscreenChanged = this.rawFullscreen !== sample.fullscreen;
       this.rawFullscreen = sample.fullscreen;
-      if (this.store.value.privacyMode || this.state.gaming) sample = { app: null, fullscreen: sample.fullscreen };
+      if (!this.store.value.appAwareness || this.store.value.privacyMode || this.state.gaming || this.isDnd() || this.conversationQuiet()) sample = { app: null, fullscreen: sample.fullscreen };
       this.refreshMode();
       if (fullscreenChanged) { if (sample.fullscreen) this.onModeChanged(); this.configureTimers(); }
+      if (!this.store.value.titleAwareness) delete sample.safeTitle;
+      const titleEvents = this.titles.observe(sample.fullscreen ? null : sample.app, sample.safeTitle);
+      const windowChanged = sample.hwnd !== this.foreground.hwnd;
+      this.foreground = sample;
+      if (titleEvents.changed || windowChanged) { this.vision.changed(); this.brain.invalidate(); }
+      if (!sample.app || sample.private || sample.fullscreen) this.vision.cancel();
       const previous = this.sessions.current?.name;
       const changed = (this.store.value.appAwareness && (!sample.app || previous !== sample.app.name)) || sample.fullscreen !== this.sessions.fullscreen;
       if (changed) this.brain.invalidate();
@@ -135,9 +163,15 @@ export class CompanionController {
       const events = this.sessions.observe(sample);
       this.configureBrain();
       // No stale app punchlines after a switch, private app, or fullscreen entry.
-      if ((changed || sample.fullscreen) && this.speech.current?.priority === 'low') this.dismissBubble();
+      if ((changed || titleEvents.changed || windowChanged || sample.fullscreen) && this.speech.current?.priority === 'low') this.dismissBubble();
       if ((sample.fullscreen || sample.private) && this.speech.current?.priority === 'medium') this.dismissBubble();
-      for (const event of events) this.respond(event);
+      for (const event of [...titleEvents.events, ...events]) {
+        // A ready vision pipeline gets the first observation after a stable switch.
+        // Otherwise an immediate app-name joke would consume its comment budget.
+        if (this.visionAllowed() && changed && event.situation.startsWith('app_') && !event.situation.endsWith('_long')) continue;
+        this.respond(event);
+      }
+      if (changed) this.resetFollow();
       if (this.debugActivity && !sample.fullscreen) {
         const activity = this.debugActivity; this.debugActivity = undefined; this.dismissBubble(); this.cancelReaction();
         if ((ACTIVITIES as readonly string[]).includes(activity)) this.performActivity(activity as Behaviour);
@@ -148,7 +182,7 @@ export class CompanionController {
         }
       }
     }, active => {
-      if (!active) { this.fullscreenKnown = false; this.cancelActivity(); if (this.body.walking) { this.body.walking = false; this.body.vx = 0; } this.setAnimation(this.state.paused ? 'idle' : this.baseAnimation()); }
+      if (!active) { this.vision.cancel(); this.titles.clear(); this.foreground = { app: null, fullscreen: false }; this.fullscreenKnown = false; this.cancelActivity(); if (this.body.walking) { this.body.walking = false; this.body.vx = 0; } this.setAnimation(this.state.paused ? 'idle' : this.baseAnimation()); }
       active = active && this.store.value.appAwareness && !this.store.value.privacyMode && !this.state.gaming && !this.isDnd();
       if (!active && this.state.awarenessActive) { this.brain.invalidate(); this.brain.clearHistory(); this.sessions.clear(); this.privateApp = false; if (this.speech.current?.priority === 'low') this.dismissBubble(); }
       if (this.state.awarenessActive !== active) { this.state.awarenessActive = active; this.publish(); }
@@ -165,7 +199,7 @@ export class CompanionController {
       this.setAnimation('sleeping'); this.dismissBubble();
     });
     this.events.on('USER_RETURNED', () => {
-      this.emotions.input('return'); this.emotions.suspend();
+      this.shortBreak = false; this.emotions.input('return'); this.emotions.suspend();
       this.state.sleeping = false; this.react('waking_up', 'happy', 900);
       const wake = this.context.wake();
       if (this.store.value.memoryEnabled && this.store.value.preferredName && Math.random() < .2) this.saySituation('memory_name'); else this.respond(wake);
@@ -201,7 +235,7 @@ export class CompanionController {
     const privacyChanged = (this.state.mode === 'privacy') !== (mode === 'privacy');
     this.state.dnd = this.isDnd(); this.state.mode = mode; this.state.gaming = this.modes.gaming;
     if (this.isDnd() || this.state.gaming) this.endDrag(false);
-    this.brain.invalidate(); this.cancelActivity(); this.cancelReaction(); this.cancelClicks(); this.dismissBubble();
+    this.vision.cancel(); this.brain.invalidate(); this.cancelActivity(); this.cancelReaction(); this.cancelClicks(); this.dismissBubble();
     this.body.walking = false; this.body.vx = 0; this.body.vy = 0;
     if (this.isDnd() || this.state.gaming) { this.state.productivitySpeech = undefined; this.state.sleeping = false; }
     if (this.state.gaming && this.store.value.gamingBehaviour === 'hide') this.window.hide();
@@ -319,6 +353,7 @@ export class CompanionController {
     this.setAnimation(this.baseAnimation()); this.configureTimers();
   }
   muteFor(minutes: number): void {
+    this.vision.cancel(); this.brain.invalidate();
     this.muteUntil = Date.now() + minutes * 60000; clearTimeout(this.muteTimer);
     this.muteTimer = setTimeout(() => { this.muteUntil = 0; this.muteTimer = undefined; }, minutes * 60000);
     if (this.speech.current?.priority === 'low') this.dismissBubble();
@@ -401,8 +436,11 @@ export class CompanionController {
   }
   private saySituation(situation: Situation, context: DialogueContext = {}): boolean {
     if (this.conversationQuiet() || this.isDnd() || this.state.gaming || (quietHours(this.store.value) && POLICIES[situation][2] === 'low')) return false;
+    if (POLICIES[situation][2] === 'low' && (this.store.value.privacyMode || this.privateApp || this.rawFullscreen || Date.now() < this.muteUntil || this.store.value.mute)) return false;
+    if (this.brain.busy && context.ambient) return false;
     this.brain.invalidate();
-    context = { ...context, personality: this.store.value.personality, profanity: this.store.value.profanity,
+    const observation = this.dialogue.canObserve() ? this.observationContext() : {};
+    context = { ...observation, ...context, observation: !!observation.app && this.state.brain.phase === 'connected' && usesAI(situation), personality: this.store.value.personality, profanity: this.store.value.profanity,
       mood: this.emotions.mood, emotions: this.emotions.words(), speechScale: this.emotions.speechScale(),
       memoryEnabled: this.store.value.memoryEnabled,
       name: this.store.value.memoryEnabled ? this.store.value.preferredName : undefined,
@@ -419,16 +457,36 @@ export class CompanionController {
       return true;
     });
   }
+  private observationContext(): DialogueContext {
+    const allowed = this.store.value.appAwareness && !this.store.value.privacyMode && !this.privateApp && !this.rawFullscreen && !this.conversationQuiet();
+    return { app: allowed ? this.sessions.current?.name : undefined, safeTitle: allowed && this.store.value.titleAwareness ? this.titles.summary : undefined,
+      personality: this.store.value.personality, profanity: this.store.value.profanity, mood: this.emotions.mood, emotions: this.emotions.words() };
+  }
+  private visionAllowed(): boolean {
+    const s = this.store.value;
+    return s.screenAwareness && s.appAwareness && s.aiEnabled && !!s.visionModel && this.state.brain.models.includes(s.visionModel) &&
+      this.state.brain.phase === 'connected' && this.ready && !this.disposed && this.state.visible && !this.state.paused && !this.state.sleeping &&
+      !s.privacyMode && !this.aiBlocked() && !this.privateApp && this.fullscreenKnown && !this.conversationQuiet() && !quietHours(s) &&
+      !s.mute && Date.now() >= this.muteUntil && !this.grab && powerMonitor.getSystemIdleTime() < 180 && s.talkativeness !== 'quiet';
+  }
+  private thoughtInterval(): number {
+    const s = this.store.value;
+    const interval = ambientDelay(s.talkativeness, this.emotions.speechScale());
+    // Leave room for the existing two-second tick and 2.5-second dialogue budget.
+    return s.talkativeness === 'unhinged' && s.aiEnabled ? Math.min(175000, interval) : interval;
+  }
+  private resetFollow(): void { const range = TALK_CADENCE[this.store.value.talkativeness].follow; this.nextFollow = range ? Date.now() + between(range) : Infinity; }
   private speechOptions(line: DirectedSpeech) {
     const area = nearestArea(this.body, workAreas());
     const tooHigh = this.windowOrigin().y <= area.y + 20;
     return { muted: this.store.value.mute || Date.now() < this.muteUntil, then: line.then, followUpDelayMs: 1500 + Math.random() * 1000,
       fullscreen: this.sessions.fullscreen,
       blocked: this.isDnd() || !!this.state.gaming || (line.priority === 'low' && quietHours(this.store.value)) || this.conversationQuiet() || !this.state.visible || this.state.paused || this.state.sleeping || tooHigh,
-      cooldownMs: this.store.value.talkativeness === 'quiet' ? 15000 : this.store.value.talkativeness === 'chatty' ? 2500 : 6500 };
+      cooldownMs: this.store.value.talkativeness === 'quiet' ? 15000 : ['chatty', 'unhinged'].includes(this.store.value.talkativeness) ? 2500 : 6500 };
   }
   private say(line: DirectedSpeech): boolean {
     if (!this.speech.offer(line.text, line.priority, this.speechOptions(line))) return false;
+    if (line.priority === 'low' && this.store.value.talkativeness === 'unhinged') this.nextThought = Date.now() + this.thoughtInterval();
     if (!this.activity) this.react(line.animation, line.emotion, line.animation === 'landing' ? 430 : 900);
     this.syncSpeech(); return true;
   }
@@ -545,7 +603,7 @@ export class CompanionController {
   private configureTimers(): void {
     this.refreshMode();
     const active = this.ready && this.state.visible && !this.state.paused && !this.disposed;
-    this.awareness.configure(active && (!this.state.sleeping || !!this.state.gaming), this.store.value.appAwareness && !this.store.value.privacyMode && !this.isDnd() && !this.state.gaming);
+    this.awareness.configure(active && (!this.state.sleeping || !!this.state.gaming), this.store.value.appAwareness && !this.store.value.privacyMode && !this.isDnd() && !this.state.gaming && !this.conversationQuiet(), this.store.value.titleAwareness, this.store.value.screenAwareness && this.store.value.aiEnabled && this.store.value.talkativeness !== 'quiet', this.store.value.excludedApps);
     this.configureBrain();
     if (!active) {
       this.cancelActivity(); this.emotions.suspend();
@@ -566,6 +624,8 @@ export class CompanionController {
     if (!active && this.idleTimer) { clearInterval(this.idleTimer); this.idleTimer = undefined; }
   }
   private configureBrain(): void {
+    if (!this.visionAllowed()) this.vision.pause();
+    this.state.screenAwarenessActive = this.store.value.screenAwareness && this.store.value.appAwareness && this.store.value.aiEnabled && !this.store.value.privacyMode;
     this.brain.configure(this.store.value, this.aiBlocked() || this.store.value.privacyMode || this.conversationInference || this.conversationQuiet() || !this.ready || this.disposed || !this.state.visible || this.state.paused ||
       this.state.sleeping || this.sessions.fullscreen || this.privateApp);
   }
@@ -597,6 +657,7 @@ export class CompanionController {
     this.refreshMode();
     if (quietHours(this.store.value) && this.speech.current?.priority === 'low') this.dismissBubble();
     if (!this.state.visible || this.state.paused || this.isDnd() || this.state.gaming || this.conversationQuiet()) return;
+    if (!this.visionAllowed()) this.vision.pause(); else if (!this.brain.busy) this.vision.tick();
     this.proactiveTick();
     this.reducedMotion = systemPreferences.getAnimationSettings().prefersReducedMotion;
     if (!this.state.sleeping) for (const event of this.context.tick()) this.respond(event);
@@ -625,27 +686,42 @@ export class CompanionController {
     } else this.setAnimation(behaviour);
   }
   private ambientTick(): void {
-    const now = Date.now();
-    const blocked = this.state.paused || !this.state.visible || this.state.sleeping || !!this.grab || !!this.activity || this.sessions.fullscreen || !this.fullscreenKnown;
-    if (now >= this.nextThought) {
-      this.nextThought = now + thoughtDelay(this.store.value.talkativeness) / this.emotions.speechScale();
-      if (!blocked) {
-        visit(this.memory, now);
-        const count = this.memory.pickupsByDay.reduce((n, d) => n + d.count, 0);
-        if (this.store.value.memoryEnabled && count >= 5 && Math.random() < .15) this.saySituation('memory_pickups', { count });
-        else if (this.store.value.memoryEnabled && [7, 30, 100].includes(this.memory.daysTogether) && this.anniversaryDay !== localDay(now) && this.saySituation('memory_anniversary', { count: this.memory.daysTogether })) this.anniversaryDay = localDay(now);
-        else if (this.state.productivity?.tasks.some(t => !t.done) && Math.random() < .1) this.saySituation('thought_tasks', { count: this.state.productivity.tasks.filter(t => !t.done).length });
-        else this.saySituation(thoughtSituation(new Date(now)));
-      }
+    const now = Date.now(), s = this.store.value;
+    const blocked = s.privacyMode || this.isDnd() || quietHours(s) || s.mute || now < this.muteUntil || this.privateApp || this.rawFullscreen ||
+      this.state.paused || !this.state.visible || this.state.sleeping || !!this.grab || this.conversationQuiet() || !this.fullscreenKnown || powerMonitor.getSystemIdleTime() >= 60;
+    if (blocked) return;
+    if (!this.nextFollow) this.resetFollow();
+    if (now >= this.nextFollow && this.sessions.current) {
+      this.resetFollow();
+      this.saySituation(this.titles.summary ? 'title_long' : 'app_generic_long', { ambient: true });
     }
-    if (!blocked && new Date(now).getHours() < 4 && now >= this.nextLate && powerMonitor.getSystemIdleTime() < 60) {
+    if (now >= this.nextThought && !this.brain.busy && !this.speech.current) {
+      if (s.talkativeness === 'unhinged') this.cancelActivity();
+      const choices: Situation[] = [thoughtSituation(new Date(now)), 'thought', 'still_here_mutter', 'activity_stretch', 'activity_yawn', 'activity_dance'];
+      const first = Math.floor(Math.random() * choices.length);
+      let accepted = false;
+      // Keep the existing explicitly enabled interaction-memory milestones.
+      if (s.memoryEnabled && [7, 30, 100].includes(this.memory.daysTogether) && this.anniversaryDay !== localDay(now)) {
+        accepted = this.saySituation('memory_anniversary', { count: this.memory.daysTogether, ambient: true });
+        if (accepted) this.anniversaryDay = localDay(now);
+      }
+      const pickups = this.memory.pickupsByDay.reduce((count, day) => count + day.count, 0);
+      if (!accepted && s.memoryEnabled && pickups >= 5 && Math.random() < .15) accepted = this.saySituation('memory_pickups', { count: pickups });
+      if (!accepted && this.state.productivity?.tasks.some(task => !task.done) && Math.random() < .1) accepted = this.saySituation('thought_tasks', { count: this.state.productivity.tasks.filter(task => !task.done).length });
+      for (let i = 0; i < choices.length && !accepted; i++) accepted = this.saySituation(choices[(first + i) % choices.length], { ambient: true });
+      if (accepted) this.nextThought = now + this.thoughtInterval();
+    }
+    if (new Date(now).getHours() < 4 && now >= this.nextLate) {
       this.nextLate = now + 45 * 60000;
       this.saySituation(this.state.awarenessActive && this.sessions.current ? 'late_night_working' : 'sleepy_late');
     }
   }
   checkIdle(): void {
     if (this.conversationQuiet() || this.grab || this.state.paused || !this.state.visible) return;
-    const sleeping = powerMonitor.getSystemIdleTime() >= this.store.value.idleToSleepMinutes * 60;
+    const idle = powerMonitor.getSystemIdleTime();
+    if (idle >= 60) this.shortBreak = true;
+    else if (this.shortBreak && !this.state.sleeping) { this.shortBreak = false; this.saySituation('wake_short', { ambient: true }); }
+    const sleeping = idle >= this.store.value.idleToSleepMinutes * 60;
     if (sleeping !== this.state.sleeping) {
       this.cancelReaction(); this.events.emit(sleeping ? 'USER_BECAME_IDLE' : 'USER_RETURNED', undefined);
       console.log('[ducky] User', sleeping ? 'idle' : 'returned'); this.configureTimers(); this.publish();
@@ -666,6 +742,9 @@ export class CompanionController {
     console.log('[ducky] Paused:', this.state.paused);
   }
   updateSettings(patch: Partial<EditableSettings>): void {
+    if (patch.excludedApps !== undefined || patch.titleAwareness !== undefined || patch.screenAwareness !== undefined || patch.aiEnabled !== undefined || patch.visionModel !== undefined || patch.privacyMode !== undefined || patch.appAwareness !== undefined) {
+      this.vision.cancel(); this.titles.clear(); this.foreground = { app: null, fullscreen: false }; this.brain.revokeContext(); this.dismissBubble();
+    }
     if (patch.privacyMode === true || patch.appAwareness === false) { this.brain.revokeContext(); this.sessions.clear(); this.proactive.clearContext(); this.privateApp = false; this.state.awarenessActive = false; this.dismissBubble(); }
     if (patch.skillPack !== undefined || patch.quietHoursEnabled !== undefined || patch.morningBriefing === false || patch.eveningSummary === false || patch.deadlineNudges === false || patch.assistanceOffers === false) this.dismissBubble();
     if (patch.personality !== undefined || patch.profanity !== undefined || patch.memoryEnabled !== undefined || patch.preferredName !== undefined) { this.brain.revokeContext(); this.dismissBubble(); }
@@ -684,7 +763,8 @@ export class CompanionController {
     if (patch.dndReminders === 'notification' && this.isDnd()) { this.state.productivitySpeech = undefined; this.onModeChanged(); }
     if (this.state.gaming) { if (this.store.value.gamingBehaviour === 'hide') this.window.hide(); else if (this.state.visible) this.window.showInactive(); }
     this.saveMemory();
-    if (patch.talkativeness) this.nextThought = Date.now() + thoughtDelay(patch.talkativeness) / this.emotions.speechScale();
+    if (patch.talkativeness) this.resetFollow();
+    if (patch.talkativeness) this.nextThought = Date.now() + this.thoughtInterval();
     if (!this.store.value.walking && this.body.walking) { this.body.walking = false; this.body.vx = 0; this.setAnimation(this.baseAnimation()); }
     if (patch.mute && this.speech.current?.priority === 'low') this.dismissBubble();
     this.applyWindowSettings(); if (sizeChanged) this.recover('character size');
@@ -708,6 +788,7 @@ export class CompanionController {
     clearTimeout(this.conversationQuietTimer);
     clearTimeout(this.muteTimer);
     this.memoryStore?.flush();
+    this.vision.cancel(); this.titles.clear(); this.foreground = { app: null, fullscreen: false };
     this.brain.dispose();
     this.disposed = true; this.cursor.stop(); this.awareness.dispose(); this.context.suspend();
     if (this.hoverTimer) clearTimeout(this.hoverTimer);

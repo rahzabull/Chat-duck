@@ -1,5 +1,45 @@
 # Ducky.exe
 
+## Livelier talk, titles and screen awareness (Milestone 6)
+
+Settings > Personality > Talkativeness now includes **Won't shut up**, independent
+of the Unhinged personality preset. Personality changes the voice; talkativeness
+sets the frequency. All levels respect DND, focus, fullscreen/gaming, privacy,
+quiet hours, open conversations and timed silence.
+
+| Talkativeness | Thoughts while active | App/title/screen comment minimum gap | Same-app follow-ups | Window samples |
+|---|---|---|---|---|
+| Quiet | 20-40 min | 15 min | none | never |
+| Normal | 8-15 min | 8 min | none | 5 min |
+| Chatty | 3-6 min | 3 min | 5-10 min | 2-3 min |
+| Won't shut up | something every 60-180 sec | 60 sec | 2-4 min | 60-90 sec |
+
+**Settings > Privacy** has two separate, default-off permissions:
+
+- **Window titles:** requires app awareness. Current titles are sanitized and
+  summarized in RAM. Private apps/sites are skipped; titles are never saved.
+- **Screen awareness - Nosy little bastard:** requires app awareness and local AI.
+  Select an installed image-capable model (gemma3:4b is the default); keep qwen3:8b
+  as the dialogue model if desired. This can see private information visible in a
+  permitted window. Read the explanation before enabling. No model downloads.
+- **Always skip these apps:** comma-separated executable names, such as
+  private-editor.exe. Built-in sensitive app exclusions cannot be removed.
+
+The eye near Ducky pulses on capture attempts. Click it or the tray's **Ducky can
+see your window (click to stop)** label to disable screen awareness immediately.
+Privacy mode stops both title and screen observation. Capture only uses an exact
+foreground window match, with no whole-screen fallback. A stable app/title change
+also schedules a sample after about 20 seconds; unchanged images skip inference.
+Slow/cold vision plus comment requests are discarded after eight seconds, so a
+first cold load may produce no remark. Off means no capture or vision requests.
+
+Nothing from titles/screenshots is written to Ducky's files, logs or conversation
+archive. Only local Ollama receives images. The resident helper renders only the
+single permitted foreground window after fresh privacy checks, using PrintWindow;
+see [privacy details and limits](docs/privacy.md).
+Claude's desktop relevance, indicator, privacy and CPU/GPU checks remain pending.
+
+
 ## Proactive intelligence, modes and skill packs - Expansion Phase C
 
 Ducky can offer a morning agenda, deadline help, an overdue review and optional
@@ -121,7 +161,7 @@ Try these with AI off as well as on:
 Enable local AI and select an installed model to ask general questions, brainstorm,
 get explanations or help with code. Conversation uses the existing main-process
 loopback Ollama provider, a 45-second deadline and an authored thinking line after
-eight seconds. No web, file-reading or screen access exists. When AI is unavailable,
+eight seconds. Conversation has no web, file-reading or screen access; the separate ambient screen opt-in is described above. When AI is unavailable,
 Ducky says so and local commands continue working.
 
 Settings > Memory supports add/edit/category/delete. The conversation archive in

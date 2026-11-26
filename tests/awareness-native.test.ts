@@ -2,6 +2,21 @@ import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from 'node:c
 import { expect, it } from 'vitest';
 import { AppAwareness } from '../src/main/platform/awareness';
 import { ForegroundFocus } from '../src/main/platform/foreground';
+import { awarenessScript } from '../src/main/platform/awareness-script';
+
+it.skipIf(process.platform !== 'win32')('compiles title-enabled and guard-only capture helpers and validates commands without reading any window', () => {
+  for (const titles of [true, false]) {
+    const definition = awarenessScript(process.pid, [], true, titles, true, ['secret-editor.exe']).split('$duckyParent =')[0];
+    const check = `
+      if (-not [DuckyForeground]::ValidCapture('capture 42 1280 800')) { throw 'Valid command rejected' }
+      foreach ($bad in @('capture 0 1 1', 'capture 42;exit 1 1', 'capture 9223372036854775808 1 1', 'capture 42 1281 800', 'capture 42 1280 801', 'capture 42 -1 1', 'capture 42 1.5 1', 'capture 42 1 1 ')) {
+        if ([DuckyForeground]::Capture($bad) -ne 'capture|skip|invalid') { throw 'Invalid command accepted' }
+      }
+    `;
+    expect(() => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', definition + check],
+      { windowsHide: true, timeout: 10000, stdio: 'pipe' })).not.toThrow();
+  }
+}, 25000);
 
 // Explicit opt-in only: this checks the actual Windows API/helper and discards app identity.
 it.skipIf(process.platform !== 'win32' || process.env.DUCKY_NATIVE_HELPER_TEST !== '1')('native helper emits a valid sample and exits on disable', async () => {

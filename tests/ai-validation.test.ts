@@ -16,7 +16,7 @@ describe('AI response validation', () => {
   it('respects schema-valid silence even with empty dialogue', () => {
     expect(check({ shouldSpeak: false, dialogue: '' }).kind).toBe('silent');
   });
-  it.each(['', '   ', 'a'.repeat(111), Array(19).fill('a').join(' '), 'Hello\nfriend', 'Hello\rfriend', 'Hi\u2028friend', 'Hi\u0000friend', '\nHello friend.', 'Hello friend.\n',
+  it.each(['', '   ', 'a'.repeat(111), Array(29).fill('a').join(' '), 'Hello\nfriend', 'Hello\rfriend', 'Hi\u2028friend', 'Hi\u0000friend', '\nHello friend.', 'Hello friend.\n',
     'Visit https://example.com', 'Visit ftp://localhost', 'Open data:text/plain,hi', 'Visit www.example.org', 'Visit example.org/path', 'Ask duck@example.com',
     '```hello```', '*hello*', '**hello**', '#hello', '[hello](somewhere)', '<b>hello</b>', '_hello_', '- a list', '1. a list', '---',
     'Hi 🦆', 'Hi 🇮🇳', 'Hi 1️⃣', 'Hi ©', 'Seriously? Again?', 'Ugh. Again.', 'Oh great, again.', 'Well, again.', 'As a duck, hello.', 'As an AI, hello.',
@@ -83,12 +83,12 @@ describe('AI response validation', () => {
   it('defaults unknown emotion and animation to the situation policy', () => {
     expect(check({ emotion: 'evil', animation: 'execute' })).toMatchObject({ kind: 'speech', speech: { emotion: 'curious', animation: 'idle' } });
   });
-  it('rejects normalized duplicates and Jaccard >= .6 from the last twenty spoken beats', () => {
+  it('rejects normalized duplicates and Jaccard >= .6 from the last thirty spoken beats', () => {
     expect(similarity('one two three', 'one two three four five')).toBe(.6);
     expect(check({}, ["I’m considering a career in sitting!"]).kind).toBe('invalid');
     expect(check({ dialogue: 'One two three.' }, ['one two three four five']).kind).toBe('invalid');
     expect(check({}, [value.dialogue, ...Array(19).fill('Something different')]).kind).toBe('invalid');
-    expect(check({}, [value.dialogue, ...Array(20).fill('Something different')]).kind).toBe('speech');
+    expect(check({}, [value.dialogue, ...Array(30).fill('Something different')]).kind).toBe('speech');
     expect(check({ then: 'Some other thought.' }, ['Some other thought!']).kind).toBe('invalid');
   });
 });

@@ -111,6 +111,31 @@ export const PRESETS: Record<PresetId, PresetDefinition> = {
     description: 'Absurd, dramatic, completely unpredictable. Occasional swearing if you allow it.',
     promptStyle: 'Absurd, dramatic and unpredictable, with grand nonsense plans and conspiracy theories about bread and pigeons. Never cruel to the user.',
     lines: {
+  title_switch: [
+    { text: "The rectangles are fleeing. Seal the borders." },
+    { text: "I've declared this a migratory emergency." },
+    { text: "My brain has requested a transfer." },
+    { text: "Stop the tour. I've lost the imaginary mayor." },
+    { text: "Another portal. The council will hear of this." },
+    { text: "I'm issuing passports to the windows." },
+  ],
+  title_long: [
+    { text: "I've founded a tiny nation in this window." },
+    { text: "This rectangle owes me a pension." },
+    { text: "I'm annexing the corner. Bring a flag." },
+    { text: "The page and I have entered treaty negotiations." },
+    { text: "I've aged into a distinguished window goblin." },
+    { text: "Declare me mayor. I've completed the residency requirement." },
+  ],
+  still_here_mutter: [
+    { text: "I'm declaring war on the concept of Tuesday." },
+    { text: "The bread parliament has rejected my proposal." },
+    { text: "I've hired a ghost. Terrible attendance." },
+    { text: "Emergency meeting. My feet have formed a union." },
+    { text: "I shall now stretch with constitutional authority." },
+    { text: "I'm building an empire. Currently it's mostly hat." },
+  ],
+
       hover: [{ text: 'THE CURSOR APPROACHES.' }, { text: 'I knew you\'d come.' }, { text: 'Speak, mortal.' }, { text: 'Not now. I\'m plotting.' }],
       hover_linger: [{ text: 'You\'ve been here too long. You know too much now.' }, { text: 'If you keep staring, I\'ll start charging admission.' }],
       click: [{ text: 'Do NOT press the duck.' }, { text: 'You have activated my trap card.' }, { text: 'That button launches the pigeons.', then: 'Too late now.' }, { text: 'Ow. Noted. Remembered. Avenged later.' }],

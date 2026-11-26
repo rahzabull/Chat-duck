@@ -1,7 +1,8 @@
 export interface AIRequest {
   model: string;
-  messages: readonly { role: 'system' | 'user' | 'assistant'; content: string }[];
+  messages: readonly { role: 'system' | 'user' | 'assistant'; content: string; images?: string[] }[];
   warmup?: boolean;
+  vision?: boolean;
   conversation?: boolean;
   summary?: boolean;
   format?: object;

@@ -27,11 +27,15 @@ export interface Settings {
   characterSize: number;
   launchAtStartup: boolean;
   walking: boolean;
-  talkativeness: 'quiet' | 'normal' | 'chatty';
+  talkativeness: 'quiet' | 'normal' | 'chatty' | 'unhinged';
   idleToSleepMinutes: number;
   reducedMotion: boolean;
   mute: boolean;
   appAwareness: boolean;
+  titleAwareness: boolean;
+  screenAwareness: boolean;
+  visionModel: string;
+  excludedApps: string[];
   aiEnabled: boolean;
   aiModel: string;
   ollamaPort: number;
@@ -58,6 +62,8 @@ export interface CompanionState {
   visible: boolean; paused: boolean; sleeping: boolean; dragging: boolean;
   sunglasses: boolean; mood: string; memory: string[];
   awarenessActive: boolean;
+  screenAwarenessActive?: boolean;
+  captureRevision?: number;
   brain: BrainState;
   animation: string; animationRevision: number; emotion: string; direction: Direction; movementSpeed: number;
   bubble: string | null; settings: Settings; debugHitbox: boolean; version: string;

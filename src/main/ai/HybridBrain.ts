@@ -1,3 +1,5 @@
+import { VISION_PROMPT, VISION_SCHEMA } from '../../core/awareness/vision';
+import { isRecord } from '../../shared/schemas/settings';
 import { OllamaError, OllamaProvider } from '../../ai/ollama';
 import { buildContext, buildPrompt } from '../../ai/prompts';
 import type { AIProvider } from '../../ai/providers';
@@ -6,7 +8,7 @@ import type { DialogueContext, DirectedSpeech, Situation } from '../../core/dial
 import { LINES } from '../../core/dialogue/lines';
 import type { BrainState, Settings } from '../../shared/types';
 
-export const usesAI = (situation: Situation): boolean => situation.startsWith('app_') || [
+export const usesAI = (situation: Situation): boolean => situation.startsWith('app_') || situation.startsWith('title_') || situation.startsWith('activity_') || situation.startsWith('event_') || ['still_here_mutter', 'screen_comment', 'wake_short', 'walk_mutter'].includes(situation) || [
   'thought_tasks', 'thought', 'thought_morning', 'thought_late', 'wake_long', 'hover_linger', 'hover_again', 'drag_long',
   'late_night_working', 'sleepy_late', 'click_forgive',
 ].includes(situation);
@@ -27,6 +29,8 @@ export class HybridBrain {
   private generation = 0;
   private pending?: AbortController;
   private recent: string[] = [];
+  private observing = false;
+  get busy(): boolean { return !!this.pending; }
   private retryTimer?: ReturnType<typeof setTimeout>;
   private retryAttempt = 0;
   private connecting?: Promise<void>;
@@ -35,7 +39,7 @@ export class HybridBrain {
     private factory: (port: number) => AIProvider = port => new OllamaProvider(port),
     private selectModel: (model: string) => void = () => {}) {}
   private update(patch: Partial<BrainState>): void { this.state = { ...this.state, ...patch }; this.changed(this.state); }
-  record(text: string): void { this.recent = [...this.recent, text].slice(-20); }
+  record(text: string): void { this.recent = [...this.recent, text].slice(-30); }
   clearHistory(): void { this.recent = []; if (this.state.sample !== undefined) this.update({ sample: undefined }); }
   /** A new event invalidates dialogue, but does not interrupt background model loading. */
   invalidate(): void { this.generation++; this.pending?.abort(); this.pending = undefined; }
@@ -118,6 +122,7 @@ export class HybridBrain {
   }
   /** Called only after the director and interruption gate accepted this event. */
   route(situation: Situation, context: DialogueContext, fallback: DirectedSpeech, validSituation: () => boolean, present: (speech: DirectedSpeech) => boolean): void {
+    if (this.observing) { if (!usesAI(situation)) present(fallback); return; }
     this.invalidate();
     if (!usesAI(situation) || this.state.phase !== 'connected' || !this.provider) { present(fallback); return; }
     const token = this.generation; const epoch = this.epoch; const controller = new AbortController(); this.pending = controller;
@@ -127,7 +132,7 @@ export class HybridBrain {
       if (!valid()) return;
       const result = validateResponse(raw, data, this.recent);
       this.update({ message: `Connected: ${this.config.aiModel}${result.kind === 'invalid' ? ' (using his built-in lines)' : ''}` });
-      if (result.kind === 'silent') return;
+      if (result.kind === 'silent' && !context.ambient) return;
       present(result.kind === 'speech' ? result.speech : fallback);
     }).catch(error => {
       if (!valid()) return;
@@ -138,6 +143,30 @@ export class HybridBrain {
       } else this.failure(error);
       present(fallback);
     }).finally(() => { if (this.pending === controller) this.pending = undefined; });
+  }
+  /** The same provider serializes vision then comment; no observation enters conversation storage. */
+  async observe(image: string, model: string, context: DialogueContext, signal: AbortSignal): Promise<DirectedSpeech | undefined> {
+    if (this.busy || this.state.phase !== 'connected' || !this.provider || signal.aborted) return;
+    this.observing = true;
+    const controller = new AbortController(); this.pending = controller;
+    const abort = () => controller.abort(); signal.addEventListener('abort', abort, { once: true });
+    try {
+      const raw = await this.provider.generate({ model, vision: true, format: VISION_SCHEMA, messages: [
+        { role: 'system', content: VISION_PROMPT }, { role: 'user', content: 'Describe the image.', images: [image] },
+      ] }, controller.signal);
+      image = '';
+      if (controller.signal.aborted || raw.length > 2000) return;
+      let value: unknown; try { value = JSON.parse(raw); } catch { return; }
+      if (!isRecord(value) || Object.keys(value).join(',') !== 'description' || typeof value.description !== 'string' || value.description.length > 500 || !value.description.trim()) return;
+      const data = buildContext('screen_comment', { ...context, screenDescription: value.description });
+      const comment = await this.provider.generate(buildPrompt(this.config.aiModel, data, this.recent), controller.signal);
+      if (controller.signal.aborted) return;
+      const result = validateResponse(comment, data, this.recent);
+      return result.kind === 'speech' ? result.speech : undefined;
+    } catch { return; } finally {
+      image = ''; signal.removeEventListener('abort', abort); this.observing = false;
+      if (this.pending === controller) this.pending = undefined;
+    }
   }
   dispose(): void { this.disposed = true; this.stop(); this.recent = []; }
 }

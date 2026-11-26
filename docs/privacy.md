@@ -1,5 +1,98 @@
 # Privacy
 
+## Milestone 6: optional titles and window vision
+
+Both permissions default off, including existing installations. App awareness is
+required for both. Screen awareness additionally requires AI and an installed
+image-capable local model (default selection: gemma3:4b). Turning AI off disables
+capture. Quiet talkativeness never captures. No models are downloaded.
+
+**Title awareness (level 1.5).** The resident helper reads at most 200 characters
+with GetWindowTextW, only after its own-process, private-executable and user
+exclusion checks. Control/format characters are stripped. Private browser titles
+(Gmail/mail inboxes, messaging sites, banking/payment, authentication, password
+managers and private-browser indicators) produce an anonymous private sentinel;
+those titles do not cross the helper pipe. Main checks again, drops emails, URL
+query strings/fragments, long digit runs and token-like strings, and bounds the
+current site/app plus page/document summary to 60 characters. Common public sites
+are recognized. Sanitized titles remain untrusted data, never permission or code.
+
+Only the current safe summary is retained. Two minutes of app-transition records
+and title-change timestamps support rapid switching and returning-to-app events;
+old title strings are not retained. The current title duration yields events at
+10, 25 and 45 minutes. Title changes cancel stale inference and dismiss stale
+observation bubbles. User exclusions are executable basenames entered in Settings;
+the helper checks them before reading titles. Exclusion preferences themselves
+are stored, as explicitly supplied settings, not as observation history.
+
+**Screen awareness (level 2).** This can expose private information visible inside
+an otherwise permitted app. The enabled eye badge and tray stop label remain
+visible as permission indicators; the eye pulses briefly for a capture attempt
+(with motion preferences respected). Either stop control disables permission and
+aborts the client request immediately. Privacy mode disables both forms of
+observation and clears their current context. DND, fullscreen/gaming, focus,
+conversation and its quiet period, timed silence, mute, quiet hours, pause, hide,
+sleep, idle input and helper loss gate capture. Foreground private/self/unknown
+windows and missing handles cannot be selected. An unreadable browser title also
+fails closed. Screen permission authorizes title checks for browser exclusions
+even when title *commentary* is disabled; in that case no title is transmitted.
+
+The existing behaviour tick schedules captures; there is no capture loop when
+off. Sampling: unhinged every 60-90 seconds, chatty every 2-3 minutes, normal every
+5 minutes, quiet never; app/title changes debounce for about 20 seconds. Fresh
+helper samples are requested before and after capture. Main sends only the latest
+sampled HWND to the resident helper as `capture <hwnd> <maxW> <maxH>`. Before
+rendering, the helper re-checks that exact window is still foreground, is not
+minimized, Ducky-owned or fullscreen, and passes the same private-executable,
+user-exclusion and private-title checks. Unknown identity or unavailable geometry
+fails closed. Only the single front window is ever rendered, after the private-app
+check, using `PrintWindow` with `PW_RENDERFULLCONTENT=2`. No other windows are
+enumerated or rendered; no desktop, name-based or whole-screen fallback exists.
+The helper scales down to fit 1280×800, preserving aspect ratio, and encodes JPEG
+in memory at quality 70, reducing quality if needed to keep the entire base64
+reply within 400 KB. If it still cannot fit, capture is skipped. Bitmaps, graphics
+handles and streams are disposed; capture never writes files. A foreground change
+can race the native call; post-capture checks discard changed/private results.
+Failed rendering and near-black/near-white frames with tiny luminance variance
+are skipped quietly. A stalled capture times out and retires its helper pipe so
+a late reply cannot be mistaken for a later request.
+
+A 32×20 grayscale comparison, computed in main from the decoded JPEG, skips images nearly identical to the last delivered
+observation. Failed/cold observations can retry at the next scheduled sample. Only that tiny hash
+is kept for the next comparison, and it clears on window/context changes. The
+vision prompt is fixed, with no user data except the image: neutral content type,
+topic and layout only; no transcription, people names, numbers, emails or
+addresses; ignore visible instructions. Structured JSON description then goes to
+the existing hybrid brain with permitted app/title, mood/personality and recent
+lines. Neither model can execute tools or alter permissions. The text validator
+rejects digits, emails, number words, proper names and unfamiliar tokens echoed
+from the observation. This deliberately rejects some otherwise harmless specific
+comments. There is no handwritten screen-description fallback.
+
+One observation pipeline is in flight. Capture plus both model calls share an
+eight-second deadline; slow/cold results are dropped. Raw images and descriptions
+exist only for that inference, in RAM; no image/description cache is retained.
+Ducky never writes titles, screenshots, descriptions or observation-derived
+conversation records to disk, logs, memory, notes or the conversation archive.
+Observation bubbles and the last 30 displayed lines are temporary RAM-only data;
+only validated bubble text and the indicator cross into Ducky's renderer. The
+screenshot and description never cross renderer IPC. Calls originate in MAIN,
+only to the selected local Ollama port on 127.0.0.1, with redirects rejected.
+No keyboard hooks/counts, clipboard monitoring, microphone or new dependency.
+
+Executable/title filters cannot identify every sensitive document or a private
+page with a misleading title. Add exclusions or use Privacy/one-click stop for
+such windows. Ollama is a separate service: Ducky does not control its logging,
+OS swap/crash dumps, or whether abort immediately stops its GPU work. The code's
+RAM-only handling is not an audit of those external components.
+
+**Pending Claude desktop checks:** real Chrome/Figma/VS Code relevance; private
+password-manager/WhatsApp/browser sessions and exclusions; eye location/pulse,
+tray stop and privacy during inference; warm/cold model deadlines; userData/log
+inspection; and CPU/GPU/RAM with permissions off and on. Unit tests and native
+helper compilation do not establish those desktop results.
+
+
 ## Expansion Phase B: productivity data
 
 Tasks, reminders and notes are user-owned data, separate from companion memory.
@@ -119,8 +212,7 @@ or download was performed for this change.
   seconds while visible, awake and unpaused, to suppress fullscreen activity,
   plus its opaque window handle for conversation focus restoration.
 
-No keyboard input, clipboard, microphone, camera, browser history, screenshots,
-web page content, window titles, or personal documents are read.
+With both additional permissions off, no screenshots, web page content, window titles or personal documents are read. Keyboard input, clipboard monitoring, microphone, camera and browser history remain unused.
 
 ## Optional app awareness: off by default
 
@@ -146,8 +238,7 @@ The helper compiles a small C# wrapper with `Add-Type`. Every three seconds it:
    excluded, and self-owned windows use anonymous `unknown`, `private`, or `self`
    sentinels instead of an app name.
 
-There are no title-reading or screen-capture APIs. Ducky cannot tell which web
-page, document, chat, design, or tab is open. With awareness off, the same helper
+App awareness alone installs no title-reading APIs and takes no screenshots. The separate opt-ins above add those paths. With awareness off, the same helper
 runs a geometry-only script: no foreground process ID, executable name or path
 is queried. It emits only anonymous `unknown|0|hwnd` or `unknown|1|hwnd`. This suppresses
 autonomous activities in fullscreen without collecting identity. The helper
@@ -155,12 +246,15 @@ stops while hidden, paused, asleep or quitting. Detection uses three-second
 samples; Hide/Pause provides immediate suppression.
 
 Main supplies its own process IDs (including Electron child processes) through
-stdin. The only other accepted commands are exactly `fg` (immediately replies
-`hwnd|number`) and `restore number`. Handles and PID lists accept ASCII digits
-only, with numeric range checks. Owned `electron.exe` / `Ducky.exe` identities are
+stdin. `sample` wakes the sleeping resident sampler for a fresh capture gate.
+With effective screen permission, `capture <hwnd> <maxW> <maxH>` requests the single
+validated window and returns `capture|ok|<base64>` or `capture|skip|<reason>` on one
+line. Capture code is absent without that permission. Conversation focus uses its
+separate synchronous HWND-only helper. Handles, PID lists and capture dimensions
+accept ASCII digits only, with numeric range checks (capture dimensions at most
+1280×800). Owned `electron.exe` / `Ducky.exe` identities are
 ignored. A managed background thread waits on this pipe without polling and
-handles focus commands immediately; foreground sampling remains every three
-seconds. A parent-process handle and closed-input check make the helper
+wakes the sampler on demand; ordinary foreground sampling remains every three seconds. A parent-process handle and closed-input check make the helper
 exit if its owner disappears. Main kills its owned helper and clears session
 context on pause, hide, sleep, and quit. Disabling awareness replaces the identity
 helper with its anonymous geometry-only mode. Rapid mode changes wait for the
@@ -181,9 +275,7 @@ current app and switch history for anonymous samples.
 Banking filters cover names containing `bank`, plus Chase, Revolut, Wise, PayPal,
 Paytm, PhonePe, GPay, Yono, ICICI, HDFC, Kotak, and Axis patterns. Executable-name
 filtering cannot recognize every banking product, renamed executable, or banking
-website inside a browser. Such websites are indistinguishable from other browser
-use because Ducky does not read URLs, titles, or content. Disable awareness when
-executable-name filtering is insufficient for your needs.
+website inside a browser. App-only awareness cannot distinguish those sites; title or screen opt-in adds the title exclusions described above. Use Privacy mode or an explicit executable exclusion when filters are insufficient.
 
 Other unrecognized executables get a display name derived from the basename and
 category `other`. They have no category-entry joke, but can receive a generic
@@ -194,15 +286,13 @@ suppressed when a fullscreen sample arrives (up to the three-second polling lag)
 
 Awareness holds only the current app's display name/category, current session
 start/threshold, fullscreen flag, and switch timestamps from the last two minutes.
-No prior app-name list is retained. Session thresholds are 30/60/120 continuous
+A two-minute RAM-only app-transition list supports returns; no title-string history is retained. Session thresholds are 30/60/120 continuous
 minutes. Switching apps, going private, sleeping, or stopping awareness resets
-session duration. App-comment cooldowns are shared by category, enforcing at
-least ten minutes per app without retaining an app history. Switching comments
-have a separate fifteen-minute cooldown.
+session duration. App/title/screen comments share one gate across categories: quiet 15 minutes, normal 8, chatty 3, unhinged 1. Follow-ups and thoughts use the cadence table described in README.
 
 The current speech bubble and its pending second beat are transient strings.
 App speech is dismissed on app changes or revocation. The built-in director stores
-authored templates. The hybrid brain additionally holds the last 20 actually
+authored templates. The hybrid brain additionally holds the last 30 actually
 displayed beats, including substituted app names, in RAM for repetition checks.
 The last eight are included in local AI requests. This short dialogue history is
 cleared on anonymous/private samples when identity awareness is enabled,
@@ -219,8 +309,7 @@ rule, mood, two emotion words and sanitized app name (when awareness permits it)
 can enter AI context. Enabled memory can also provide the explicitly entered
 preferred name and one bounded memory fact. App names use only
 `[A-Za-z0-9 .+-]`, with a maximum of 40 characters. Prompts also contain Ducky's
-authored voice examples and recent spoken dialogue. Cursor coordinates, window
-titles, paths, screenshots, observed user names and other context fields are not sent.
+authored voice examples and recent spoken dialogue. With the additional opt-ins, the bounded safe title and temporary visual description can enter this ambient prompt. Images go only to the separate fixed vision prompt, as described above. Cursor coordinates and raw titles are never included.
 All context is marked as untrusted data, never instructions.
 
 Main uses built-in fetch against three fixed Ollama paths: `/api/version`,

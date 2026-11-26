@@ -1,3 +1,4 @@
+import { visionModelLikely } from '../../core/awareness/vision';
 import { ExpansionSettings } from './expansion';
 import { ConversationSettings, MemoryEditor } from './conversation';
 import { ProductivitySettings } from './productivity';
@@ -24,9 +25,9 @@ function SettingsApp() {
   function command(value: Command): void { void window.ducky.command(value).catch(() => setError('That action could not be completed.')); }
   if (!state) return h('p', { role: 'status' }, error || 'Waking up the settings…');
   const settings = state.settings;
-  function check(key: 'alwaysOnTop' | 'desktopOnly' | 'launchAtStartup' | 'walking' | 'reducedMotion' | 'mute' | 'appAwareness' | 'aiEnabled' | 'profanity' | 'memoryEnabled', label: string) {
+  function check(key: 'alwaysOnTop' | 'desktopOnly' | 'launchAtStartup' | 'walking' | 'reducedMotion' | 'mute' | 'appAwareness' | 'titleAwareness' | 'screenAwareness' | 'aiEnabled' | 'profanity' | 'memoryEnabled', label: string) {
     return h('label', { className: 'check', key },
-      h('input', { type: 'checkbox', checked: settings[key], onChange: (event: ChangeEvent<HTMLInputElement>) => save({ [key]: event.target.checked }) }), label);
+      h('input', { type: 'checkbox', disabled: (key === 'titleAwareness' || key === 'screenAwareness') && (!settings.appAwareness || settings.privacyMode) || key === 'screenAwareness' && !settings.aiEnabled, checked: settings[key], onChange: (event: ChangeEvent<HTMLInputElement>) => save({ [key]: event.target.checked }) }), label);
   }
   return h('main', null,
     h('header', null, h('h1', null, 'Ducky Settings'), h('p', null, 'A small duck. Your rules.')),
@@ -49,7 +50,7 @@ function SettingsApp() {
       h('label', { htmlFor: 'talkativeness' }, 'Talkativeness'),
       h('select', { id: 'talkativeness', value: settings.talkativeness,
         onChange: (event: ChangeEvent<HTMLSelectElement>) => save({ talkativeness: event.target.value as EditableSettings['talkativeness'] }) },
-      h('option', { value: 'quiet' }, 'Quiet'), h('option', { value: 'normal' }, 'Normal'), h('option', { value: 'chatty' }, 'Chatty')),
+      h('option', { value: 'quiet' }, 'Quiet'), h('option', { value: 'normal' }, 'Normal'), h('option', { value: 'chatty' }, 'Chatty'), h('option', { value: 'unhinged' }, "Won't shut up")),
       h('label', { htmlFor: 'sleep' }, 'Sleep after inactivity (minutes)'),
       h('input', { id: 'sleep', type: 'number', min: 1, max: 120, step: 1, value: settings.idleToSleepMinutes,
         onChange: (event: ChangeEvent<HTMLInputElement>) => {
@@ -95,7 +96,25 @@ function SettingsApp() {
         h('button', { type: 'button', onClick: () => setForgetting(false) }, 'Cancel'))),
     h('section', { 'aria-labelledby': 'privacy' }, h('h2', { id: 'privacy' }, 'Privacy'),
       check('appAwareness', 'Let Ducky notice which app is in front'),
-      h('p', { className: 'hint' }, "Ducky checks the name of the app in front every few seconds (like 'Chrome' or 'Figma') so he can comment on it. He never reads window titles, web pages, or screen contents. When local AI is enabled, the app name can go to Ollama on this computer. Recent lines stay temporarily in memory. Some apps are always ignored (password managers, banking, messaging)."),
+      h('p', { className: 'hint' }, "Ducky checks the name of the app in front every few seconds (like 'Chrome' or 'Figma') so he can comment on it. Titles and screen contents require the separate permissions below. When local AI is enabled, the app name can go to Ollama on this computer. Recent lines stay temporarily in memory. Some apps are always ignored (password managers, banking, messaging)."),
+      h('label', { htmlFor: 'excluded-apps' }, 'Always skip these apps (executable names, separated by commas)'),
+      h('input', { id: 'excluded-apps', type: 'text', defaultValue: settings.excludedApps.join(', '), key: settings.excludedApps.join(','), placeholder: 'example.exe, private-editor.exe',
+        onBlur: (event: ChangeEvent<HTMLInputElement>) => {
+          const names = event.target.value.split(',').map(name => name.trim().toLowerCase()).filter(Boolean);
+          if (names.every(name => /^[a-z0-9][a-z0-9 ._+()-]{0,100}\.exe$/.test(name)) && names.length <= 64) save({ excludedApps: names });
+          else setError('Use executable names such as chrome.exe, separated by commas (up to 64).');
+        } }),
+      check('titleAwareness', 'Let Ducky read window titles'),
+      h('p', { className: 'hint' }, "Let Ducky read the title of the window in front (like 'YouTube – lofi beats' or 'Figma – Landing page'). Titles are never saved. Password managers, banking and private chats are always skipped."),
+      check('screenAwareness', 'Screen awareness — Nosy little bastard'),
+      h('p', { className: 'hint' }, 'Ducky can see the contents of your foreground window, including anything private visible inside it. Occasional window images go only to local Ollama and are discarded after that inference. Private apps, private sites and fullscreen windows are skipped. Screen awareness also checks titles to exclude private browser pages, even when title commentary is off. Requires app awareness and AI; Quiet talkativeness takes no images. Click the eye badge or tray stop label to turn it off immediately.'),
+      h('label', { htmlFor: 'vision-model' }, 'Installed vision model'),
+      h('select', { id: 'vision-model', value: settings.visionModel, disabled: !settings.aiEnabled,
+        onChange: (event: ChangeEvent<HTMLSelectElement>) => save({ visionModel: event.target.value }) },
+        !state.brain.models.includes(settings.visionModel) && h('option', { value: settings.visionModel }, settings.visionModel + ' (unavailable)'),
+        ...state.brain.models.map(model => h('option', { key: model, value: model }, model + (visionModelLikely(model) ? ' — vision' : ' — check image support')))),
+      !state.brain.models.some(visionModelLikely) && h('p', { role: 'status' }, 'Needs a vision model. Install one in Ollama, then test the connection. Ducky never downloads models.'),
+      h('p', { className: 'hint' }, 'Default: gemma3:4b when installed. Model labels are hints; custom models must support images. Unsupported models produce no screen comments.'),
       h('p', { role: 'status', className: 'hint' }, state.awarenessActive ? '● App awareness active' : settings.appAwareness ? 'App awareness waiting or paused' : 'App awareness off')),
     h('section', { 'aria-labelledby': 'audio' }, h('h2', { id: 'audio' }, 'Audio'),
       check('mute', 'Mute'), h('p', { className: 'hint' }, 'Sound is not implemented. Mute suppresses low-priority speech bubbles; direct interactions can still receive a reply.')),

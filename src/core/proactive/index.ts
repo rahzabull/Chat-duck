@@ -57,7 +57,7 @@ export class ProactiveScheduler {
       // Failed rolls/director refusals back off too: silence is a decision, not a two-second retry.
       this.attempts.set(candidate.key, now + (candidate.id === 'gaming_back' ? 60000 : 10 * 60000));
       const chance = candidate.id === 'gaming_back' ? .15 : candidate.app ? .4 : .8;
-      if (!debug && this.rng() >= chance * (s.talkativeness === 'quiet' ? .5 : s.talkativeness === 'chatty' ? 1.2 : 1)) continue;
+      if (!debug && this.rng() >= chance * (s.talkativeness === 'quiet' ? .5 : ['chatty', 'unhinged'].includes(s.talkativeness) ? 1.2 : 1)) continue;
       if (!offer(candidate)) return;
       if (candidate.app) this.apps.set(candidate.app, now + 3 * 3600000);
       else if (candidate.id === 'gaming_back') this.comebackUntil = 0;

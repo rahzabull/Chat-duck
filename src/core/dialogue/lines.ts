@@ -20,6 +20,7 @@ export interface Line {
 }
 
 export type Situation =
+  | 'title_switch' | 'title_long' | 'screen_comment' | 'still_here_mutter' | 'app_return'
   | 'briefing_morning' | 'summary_evening' | 'deadline_nudge' | 'overdue_nudge' | 'assist_offer_design' | 'assist_offer_writing' | 'assist_offer_code' | 'gaming_back' | 'dnd_on' | 'privacy_on' | 'thought_tasks'
   | 'activity_yawn'
   | 'activity_stretch'
@@ -45,6 +46,48 @@ export type Situation =
   | 'app_switching' | 'app_generic_long' | 'late_night_working';
 
 export const LINES: Record<Situation, Line[]> = {
+  title_switch: [
+    { text: "New page. I'll pretend I kept up." },
+    { text: "We're touring the rectangles today." },
+    { text: "Hang on. My attention has little legs." },
+    { text: "That page barely got comfortable." },
+    { text: "I should've packed for this journey." },
+    { text: "Right. New chapter. Same unemployed duck." },
+    { text: "I've appointed myself head of transitions." },
+    { text: "The scenery changes. My qualifications don't." },
+  ],
+  title_long: [
+    { text: "This page and I are practically colleagues." },
+    { text: "Still here. I've mentally furnished the place." },
+    { text: "I could get a lease on this rectangle." },
+    { text: "This is becoming a very committed relationship with a window." },
+    { text: "I'll supervise. Quietly incompetent, as usual." },
+    { text: "We've been here a while. Shall I put the kettle on?" },
+    { text: "The page remains. My attention has wandered off for bread." },
+    { text: "Long shift for a rectangle." },
+  ],
+  still_here_mutter: [
+    { text: "I've had a thought. Management is investigating." },
+    { text: "Just checking my wings. Still deeply impractical." },
+    { text: "I might stretch. Huge day for the skeleton." },
+    { text: "My plan is to look occupied until something happens." },
+    { text: "I'm conducting a small audit of absolutely nothing." },
+    { text: "Do you think chairs know they're furniture?" },
+    { text: "I'm taking a break from my break." },
+    { text: "Tiny update. I've promoted myself." },
+  ],
+  app_return: [
+    { text: "Back in {app}. I kept the imaginary seat warm." },
+    { text: "{app} again. Familiar territory, questionable guide." },
+    { text: "We've returned. I'll unpack my opinions." },
+    { text: "Hello again, {app}. Still a rectangle, then." },
+    { text: "Round trip complete. No luggage lost." },
+    { text: "Back here. I recognise the general situation." },
+    { text: "{app} has rejoined the meeting." },
+    { text: "I knew we'd be back. Based on absolutely nothing." },
+  ],
+  // Visual claims are AI-only; this situation intentionally has no fallback.
+  screen_comment: [],
   briefing_morning: [
     { text: "Good morning. You've got {count} tasks today. I've got none. Life is beautiful." },
     { text: "Morning. {count} tasks due today. I have brought moral support. It's mostly feathers." },
@@ -251,6 +294,30 @@ export const LINES: Record<Situation, Line[]> = {
   ],
 
   thought: [
+    { text: "I suspect the floor is up to something." },
+    { text: "Bread has no pockets. That's a design failure." },
+    { text: "I'm considering a career in standing nearby." },
+    { text: "My imaginary assistant has resigned." },
+    { text: "What if ponds are just outdoor soup bowls?" },
+    { text: "I have excellent posture for someone shaped like this." },
+    { text: "I'm waiting for my ambition to hatch." },
+    { text: "I could start a business. Or sit down." },
+    { text: "The hat is doing most of the professional work." },
+    { text: "I have no deadlines. It's a demanding schedule." },
+    { text: "My wings have declined to comment." },
+    { text: "I wonder who interviews scarecrows." },
+    { text: "I deserve a tiny revolving chair." },
+    { text: "I have misplaced a completely hypothetical document." },
+    { text: "Today feels like a good day to remain a duck." },
+    { text: "I briefly understood economics. It passed." },
+    { text: "I'm saving my energy for a very small emergency." },
+    { text: "The committee in my head has requested snacks." },
+    { text: "I could learn a skill. That's quite a commitment." },
+    { text: "I'm investigating whether naps count as research." },
+    { text: "I've decided the hat needs a deputy." },
+    { text: "Somewhere there's a pond with no meetings." },
+    { text: "My confidence continues to exceed my training." },
+    { text: "I think the furniture is judging my commute." },
     { text: 'Do you ever think about how bread is just... soft toast?' },
     { text: 'I\'ve been thinking.', then: 'Do ducks know they\'re ducks?' },
     { text: 'I think I\'d be good at podcasting. I have opinions.' },

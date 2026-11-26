@@ -431,3 +431,50 @@ it('releases an in-progress drag when DND takes over and remains calm', () => {
   expect(controller.state.dragging).toBe(false); expect(controller.state.animation).toBe('idle');
   vi.advanceTimersByTime(2000); expect(controller.state.animation).toBe('idle'); expect(controller.state.bubble).toBeNull();
 });
+
+
+describe('Milestone 6 scheduling and revocation', () => {
+  it.each([0, .5, .999])('speaks every 60-180 seconds with unhinged talk and active input (rng=%s)', random => {
+    vi.mocked(Math.random).mockReturnValue(random);
+    create({ talkativeness: 'unhinged', personality: 'unhinged', memoryEnabled: false, activityLevel: 'lively' });
+    const control = controller as unknown as { scheduler: { tick(): unknown }; nextThought: number; ambientTick(): void };
+    vi.spyOn(control.scheduler, 'tick').mockReturnValue(undefined);
+    const times: number[] = [];
+    let previous: string | null = null;
+    controller.onChanged = () => { if (controller.state.bubble && !previous) times.push(Date.now()); previous = controller.state.bubble; };
+    const start = Date.now();
+    vi.advanceTimersByTime(45 * 60000);
+    expect(times.length).toBeGreaterThan(14);
+    let last = start;
+    for (const time of times) { expect(time - last).toBeGreaterThanOrEqual(60000); expect(time - last).toBeLessThanOrEqual(180000); last = time; }
+  });
+  it.each(['privacy', 'dnd', 'fullscreen', 'focus', 'quiet hours', 'be quiet', 'conversation', 'idle'] as const)('suppresses unhinged ambient lines during %s', mode => {
+    create({ talkativeness: 'unhinged', memoryEnabled: false });
+    if (mode === 'privacy') controller.updateSettings({ privacyMode: true });
+    if (mode === 'dnd') controller.updateSettings({ dndUntil: -1 });
+    if (mode === 'fullscreen') driver.sample({ app: null, fullscreen: true });
+    if (mode === 'focus') controller.presentProductivity({ ...FOCUS_DEFAULTS, tasks: [], reminders: [], notes: [], focus: { kind: 'focus' } } as unknown as ProductivityView);
+    if (mode === 'quiet hours') controller.updateSettings({ quietHoursEnabled: true, quietHoursStart: '00:00', quietHoursEnd: '00:00' });
+    if (mode === 'be quiet') controller.muteFor(60);
+    if (mode === 'conversation') (controller as unknown as { conversationActive: boolean }).conversationActive = true;
+    if (mode === 'idle') driver.idle = 120;
+    controller.dismissBubble(); internals().nextThought = Date.now();
+    vi.advanceTimersByTime(600000); expect(controller.state.bubble).toBeNull();
+  });
+  it('clears title context and aborts actual pending observation inference immediately on privacy toggle', async () => {
+    const fetcher = await createWithAI(); controller.updateSettings({ titleAwareness: true, screenAwareness: true }); await flushAI();
+    driver.sample({ app: { name: 'Figma', category: 'design' }, hwnd: '42', safeTitle: 'Figma: Landing page', fullscreen: false }); await flushAI();
+    const internal = controller as unknown as { brain: import('../src/main/ai/HybridBrain').HybridBrain; titles: { summary?: string } };
+    fetcher.mockClear();
+    let complete!: (response: Response) => void;
+    fetcher.mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    const result = internal.brain.observe('IMAGE_ONLY', 'gemma3:4b', {}, new AbortController().signal);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const signal = fetcher.mock.calls[0][1]!.signal!;
+    controller.updateSettings({ privacyMode: true });
+    expect(signal.aborted).toBe(true); expect(internal.titles.summary).toBeUndefined(); expect(controller.state.screenAwarenessActive).toBe(false);
+    expect(JSON.stringify(controller.store.value)).not.toContain('Landing page');
+    complete(new Response(JSON.stringify({ message: { content: JSON.stringify({ description: 'A layout.' }) } })));
+    expect(await result).toBeUndefined(); expect(controller.state.bubble).toBeNull();
+  });
+});

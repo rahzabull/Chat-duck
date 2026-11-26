@@ -1,7 +1,7 @@
 import type { SituationEvent } from '../dialogue/context';
 export type AppCategory = 'browser' | 'code' | 'design' | 'video_edit' | '3d' | 'ai' | 'office' | 'files' | 'terminal' | 'music' | 'other';
 export interface ForegroundApp { name: string; category: AppCategory }
-export interface ForegroundSample { app: ForegroundApp | null; fullscreen: boolean; private?: boolean }
+export interface ForegroundSample { app: ForegroundApp | null; fullscreen: boolean; private?: boolean; hwnd?: string; safeTitle?: string }
 // Also embedded into the helper so private names never cross its stdout pipe.
 export const PRIVATE_EXE_PATTERN = '^(1password|bitwarden|keepass.*|lastpass|dashlane|whatsapp|telegram|signal|discord.*|slack|teams|ms-teams|msteams|messenger|zoom.*|consent|credentialuibroker|lockapp|logonui|.*bank.*|chase|revolut|wise|paypal|paytm|phonepe|gpay|yono.*|icici.*|hdfc.*|kotak.*|axis.*)(\\.exe)?$';
 const privateExe = new RegExp(PRIVATE_EXE_PATTERN, 'i');

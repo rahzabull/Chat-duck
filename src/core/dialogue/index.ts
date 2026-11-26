@@ -1,3 +1,4 @@
+import { TALK_CADENCE, between } from './cadence';
 import { PRESETS } from './presets';
 import { sanitizeName } from '../memory';
 import type { Mood } from '../emotions';
@@ -8,6 +9,7 @@ import { LINES, type Line, type Situation } from './lines';
 export type { Situation } from './lines';
 
 export interface DialogueContext {
+  safeTitle?: string; screenDescription?: string; ambient?: boolean; observation?: boolean;
   overdue?: number; remaining?: number; reminder?: string; task?: string; deadline?: string;
   personality?: Settings['personality']; profanity?: boolean; speechScale?: number;
   mood?: Mood; emotions?: string[]; memoryEnabled?: boolean; name?: string; memoryFact?: string;
@@ -18,6 +20,11 @@ export interface DirectedSpeech { text: string; then?: string; priority: Priorit
 type Policy = readonly [chance: number, cooldownSeconds: number, priority: Priority, emotion: EmotionId, animation: AnimationId];
 /** All speech probabilities and per-situation cooldowns live here. */
 export const POLICIES: Record<Situation, Policy> = {
+  title_switch: [1, 60, 'low', 'curious', 'look_right'],
+  title_long: [1, 60, 'low', 'suspicious', 'look_left'],
+  still_here_mutter: [1, 60, 'low', 'curious', 'idle'],
+  app_return: [1, 60, 'low', 'curious', 'idle'],
+  screen_comment: [1, 60, 'low', 'curious', 'look_right'],
   briefing_morning: [.95, 3600, 'low', 'happy', 'idle'],
   summary_evening: [.9, 3600, 'low', 'happy', 'idle'],
   deadline_nudge: [.85, 1800, 'low', 'curious', 'idle'],
@@ -83,8 +90,7 @@ export function thoughtSituation(date: Date): Situation {
   return hour >= 6 && hour < 10 ? 'thought_morning' : hour < 4 ? 'thought_late' : 'thought';
 }
 export function thoughtDelay(talk: Settings['talkativeness'], rng = Math.random): number {
-  const [min, max] = talk === 'quiet' ? [15, 35] : talk === 'chatty' ? [4, 10] : [8, 20];
-  return (min + rng() * (max - min)) * 60000;
+  return between(TALK_CADENCE[talk].thoughts, rng);
 }
 const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
 function numberWords(n: number): string {
@@ -119,18 +125,24 @@ export class DialogueDirector {
   private recent: Line[] = [];
   private rubberDuckUsed = false;
   private cooldowns = new Map<Situation, number>();
-  private appAllowed = new Map<string, number>();
+  private appAllowed = 0;
   constructor(private rng = Math.random, private clock = Date.now) {}
+  canObserve(): boolean { return this.clock() >= this.appAllowed; }
+  observeScreen(accept: () => boolean, talk: Settings['talkativeness']): boolean {
+    if (this.clock() < this.appAllowed || !accept()) return false;
+    this.appAllowed = this.clock() + TALK_CADENCE[talk].app;
+    return true;
+  }
   decide(situation: Situation, context: DialogueContext = {}, accept: (speech: DirectedSpeech) => boolean = () => true): DirectedSpeech | null {
     const now = this.clock();
     const [chance, cooldown, priority, emotion, animation] = POLICIES[situation];
     if (context.fullscreen && priority !== 'high') return null;
-    const appComment = situation.startsWith('app_') && situation !== 'app_switching';
-    const appGroup = situation.replace(/_long$/, '');
-    if (now < (this.cooldowns.get(situation) ?? 0) || (appComment && now < (this.appAllowed.get(appGroup) ?? 0))) return null;
-    const scale = context.talkativeness === 'quiet' ? .5 : context.talkativeness === 'chatty' ? 1.5 : 1;
+    const appComment = context.observation || situation.startsWith('app_') || situation.startsWith('title_') || situation === 'screen_comment';
+    const cadence = TALK_CADENCE[context.talkativeness ?? 'normal'];
+    if ((!context.ambient && !appComment && now < (this.cooldowns.get(situation) ?? 0)) || (appComment && now < this.appAllowed)) return null;
+    const scale = context.talkativeness === 'quiet' ? .5 : context.talkativeness === 'chatty' ? 1.5 : context.talkativeness === 'unhinged' ? 2 : 1;
     // Strong physical reactions remain dependable even for a quiet duck.
-    if (this.rng() >= Math.min(1, (chance >= .9 ? chance : chance * scale) * (priority === 'high' ? 1 : context.speechScale ?? 1))) return null;
+    if (!context.ambient && this.rng() >= Math.min(1, (chance >= .9 ? chance : chance * scale) * (priority === 'high' ? 1 : context.speechScale ?? 1))) return null;
     const preset = PRESETS[context.personality ?? 'sarcastic'];
     const overlays = preset.lines[situation]?.filter(eligibleLine);
     const profane = context.profanity ? preset.profane?.[situation]?.filter(eligibleLine) : undefined;
@@ -156,10 +168,10 @@ export class DialogueDirector {
       animation: situation === 'thought' ? (['idle', 'look_left', 'look_right'] as const)[Math.floor(this.rng() * 3)] : animation };
     if (!accept(speech)) return null;
     if (/rubber-duck/.test(line.text)) this.rubberDuckUsed = true;
-    bag.splice(index, 1); this.recent = [...this.recent, line].slice(-12);
+    bag.splice(index, 1); this.recent = [...this.recent, line].slice(-30);
     this.cooldowns.set(situation, now + cooldown * 1000);
-    // Category-shared gates also enforce ten minutes per app, without app histories.
-    if (appComment) this.appAllowed.set(appGroup, now + 600000);
+    // One observation gate across categories; rapid switching cannot bypass it.
+    if (appComment) this.appAllowed = now + cadence.app;
     return speech;
   }
 }

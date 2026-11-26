@@ -1,3 +1,4 @@
+import { observationLeaks } from '../../core/awareness/vision';
 import { ANIMATION_IDS, EMOTION_IDS, type AnimationId, type EmotionId } from '../../animation/adapter';
 import { POLICIES, type DirectedSpeech } from '../../core/dialogue';
 import { isRecord } from '../../shared/schemas/settings';
@@ -60,6 +61,7 @@ function groundedTimes(text: string, context: AIContext): string | undefined {
 const cleanQuotes = (text: string): string => text.replace(/”/g, '').replace(/^ *["“']+|["“']+ *$/g, '').replace(/^ +| +$/g, '');
 const wordCount = (text: string): number => text.split(/\s+/).filter(word => /[\p{L}\p{N}]/u.test(word)).length;
 function validBeat(text: string, limit: number, context: AIContext, recent: readonly string[]): boolean {
+  if ((context.safeTitle || context.screenDescription) && observationLeaks(text, (context.safeTitle ?? '') + ' ' + (context.screenDescription ?? ''))) return false;
   if (text.length > limit || text.trim().split(/\s+/).length > 18) return false;
   if (/[\r\n\u2028\u2029\u0000-\u001f\u007f\u0085]/u.test(text) || /[\p{Extended_Pictographic}\p{Regional_Indicator}\u200d\ufe0f\u20e3]/u.test(text)) return false;
   if (/[^\x00-\x7f]/u.test(text.replace(/[^\p{N}]/gu, ''))) return false;
@@ -73,7 +75,7 @@ function validBeat(text: string, limit: number, context: AIContext, recent: read
   if ((withoutTimes.match(/\d+/g) ?? []).some(number => !numbers.has(number))) return false;
   const factWords = words(facts);
   if ((text.match(invented) ?? []).some(word => !factWords.has(word.toLowerCase()))) return false;
-  return !recent.slice(-20).some(line => similarity(text, line) >= .6);
+  return !recent.slice(-30).some(line => similarity(text, line) >= .6);
 }
 export function validateResponse(raw: string, context: AIContext, recent: readonly string[]): Validation {
   if (raw.length > 8192) return { kind: 'invalid' };

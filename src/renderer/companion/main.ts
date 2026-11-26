@@ -12,6 +12,13 @@ const host = document.getElementById('character')!;
 const bubble = document.getElementById('bubble') as HTMLButtonElement;
 const adapter: CharacterSurface = window.ducky.placeholderDuck ? new PlaceholderDuck(host) : new FigmaDuck(host);
 const api = window.ducky;
+const eye = document.createElement('button');
+eye.id = 'awareness-eye'; eye.textContent = '\u{1F441}'; eye.hidden = true;
+eye.title = 'Ducky can see your window. Click to stop.';
+eye.setAttribute('aria-label', 'Stop screen awareness');
+eye.addEventListener('pointerdown', event => event.stopPropagation());
+eye.addEventListener('click', () => { eye.hidden = true; void api.updateSettings({ screenAwareness: false }); });
+document.body.appendChild(eye);
 const conversation = new ConversationUI(host, bubble, adapter);
 const productivity = new ProductivityUI(host);
 const proactive = new ProactiveUI();
@@ -29,7 +36,7 @@ function reportHit(x: number, y: number, force = false): void {
   const duck = adapter.hitTest(x, y);
   const element = document.elementFromPoint(x, y);
   const onBubble = !bubble.hidden && !!element && bubble.contains(element);
-  const hit = captured !== undefined || duck || onBubble || conversation.hit(element) || productivity.hit(element) || proactive.hit(element);
+  const hit = captured !== undefined || duck || onBubble || conversation.hit(element) || productivity.hit(element) || proactive.hit(element) || !eye.hidden && !!element && eye.contains(element);
   if (force || hit !== interactive) { interactive = hit; api.hitTest(hit); }
   if (hovering !== duck) { hovering = duck; api.hover(duck); }
 }
@@ -37,6 +44,11 @@ function render(next: CompanionState): void {
   const previous = state;
   const wasDragging = state?.dragging;
   state = next;
+  eye.hidden = !next.screenAwarenessActive;
+  if (previous && previous.captureRevision !== next.captureRevision && !next.settings.reducedMotion && !reducedPreference.matches) {
+    eye.getAnimations().forEach(animation => animation.cancel());
+    eye.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.25)' }, { transform: 'scale(1)' }], { duration: 650 });
+  }
   adapter.setReducedMotion(next.settings.reducedMotion || reducedPreference.matches);
   document.body.classList.toggle('reduced', next.settings.reducedMotion || reducedPreference.matches);
   adapter.setVisible(next.visible && !(next.gaming && next.settings.gamingBehaviour === 'hide')); adapter.setPaused(!!next.gaming || next.paused && !next.conversation?.active);

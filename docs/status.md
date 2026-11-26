@@ -1,5 +1,41 @@
 # Ducky implementation status
 
+## Milestone 6 — livelier talk, titles and window vision (2026-11-26)
+
+| Area | Implementation | Verification |
+|---|---|---|
+| Talk levels | One cadence table; livelier Chatty; Won't shut up; bounded personality scaling; authored thought/mutter/activity mix | Fake clocks cover 45 minutes at three random values, 60–180 second spacing, and suppression gates |
+| Activity reactions | App returns, rapid title switches, 10/25/45 minute title dwell, same-app follow-ups, short-break returns | Pure tracker and controller tests; perceived desktop liveliness pending Claude |
+| Title opt-in | Default off; requires app awareness; 200-character native read after exclusions; private-site filtering; 60-character sanitized summary | Protocol, sanitization, exclusion-order tests; both native C# variants compile on Windows |
+| Screen opt-in | Default off; requires AI and app awareness; installed-model picker; resident helper renders one checked HWND via PrintWindow; no screen fallback | Protocol, exclusion-order, native synthetic-window and JPEG/hash tests; real Chrome/Figma/VS Code relevance pending Claude |
+| Capture scheduling | Existing tick, periodic cadence and 20-second change debounce, 32×20 grayscale skip, one pipeline, eight-second total deadline | Fake clocks cover rates, unchanged frames, slow capture, late responses and no work when off |
+| Local AI | Fixed image-only observation prompt; structured description then existing hybrid comment; leak/repetition checks; no visual fallback | Mock provider tests cover prompt separation, ordering, rejection and abort; live model latency/quality pending Claude |
+| Privacy controls | User executable exclusions before title reads; mode and permission revocation; no observation persistence path | Unit/controller tests cover privacy abort, private/self/fullscreen selection and strict settings storage; userData/log audit pending Claude |
+| Visible controls | Eye badge with bounded pulse; badge and tray one-click stop; strong Settings explanation | Source wiring implemented; desktop appearance/hit testing pending Claude |
+| Performance | No continuous capture, no new capture polling timer, no image/description cache, no new dependency | Off-state zero-capture tests; real idle CPU, GPU, memory and cold-load measurements pending Claude |
+
+Validation: `npm run typecheck`, `npm test` and `npm run build` pass after the
+single-window capture replacement. Windows tests compile both title-enabled and
+guard-only capture helpers and exercise native refusals and JPEG scaling with
+synthetic Win32 APIs, without inspecting or capturing any real window. The existing
+non-fatal Vite native-config warning remains. No commits, npm dependencies, MCP
+tools or live network requests were made.
+
+**Desktop acceptance is pending Claude.** Enable both permissions with qwen3:8b
+for dialogue and gemma3:4b for vision; check real topic-specific bubbles in
+Chrome/Figma/VS Code, password-manager/WhatsApp/private web pages and user
+exclusions, privacy/stop while inference runs, eye pulse/tray hit testing,
+userData/log contents, and CPU/GPU with features off/on. Cold requests exceeding
+eight seconds intentionally produce no screen comment.
+
+**Round 2 capture:** Electron thumbnail enumeration is removed. The resident
+helper validates a digits-only capture command, checks the exact HWND and private
+exe/title exclusions before PrintWindow, and returns one in-memory JPEG capped
+at 400 KB. Main skips blank and near-duplicate images. Native window/tab changes
+can still race capture; fresh checks and epoch cancellation discard stale results.
+This must not be represented as an OS-level exclusion guarantee. See
+[privacy.md](privacy.md) for filtering and local-service limitations.
+
 ## Expansion Phase C (2026-11-25)
 
 | Area | Implementation | Verification |
