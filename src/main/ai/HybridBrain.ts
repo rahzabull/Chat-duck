@@ -1,4 +1,4 @@
-import { VISION_PROMPT, VISION_SCHEMA } from '../../core/awareness/vision';
+﻿import { VISION_PROMPT, VISION_SCHEMA } from '../../core/awareness/vision';
 import { isRecord } from '../../shared/schemas/settings';
 import { OllamaError, OllamaProvider } from '../../ai/ollama';
 import { buildContext, buildPrompt } from '../../ai/prompts';
@@ -15,7 +15,8 @@ export const usesAI = (situation: Situation): boolean => situation.startsWith('a
 type Config = Pick<Settings, 'aiEnabled' | 'aiModel' | 'ollamaPort'> & Partial<Pick<Settings, 'personality' | 'profanity'>>;
 export const initialBrainState = (): BrainState => ({ phase: 'disabled', message: 'Built-in lines active', models: [] });
 
-const preferredModels = ['qwen3:8b', 'qwen3:4b', 'gemma3:4b'];
+// Ducky's own fine-tuned brain first (see ducky-brain/), then general models.
+const preferredModels = ['ducky:4b', 'qwen3:8b', 'qwen3:4b', 'gemma3:4b'];
 const retryDelays = [15000, 30000, 60000, 120000];
 
 /** Main-process owner of inference, diagnostics, and suspended-aware recovery. */

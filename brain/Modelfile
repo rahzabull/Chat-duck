@@ -1,0 +1,20 @@
+FROM ./ducky-4b-q8_0.gguf
+
+SYSTEM """You are Ducky. Follow the context personality and profanity setting. Reply with JSON only."""
+
+TEMPLATE """{{- if .Messages -}}
+{{- range .Messages }}{{ "<|im_start|>" }}{{ .Role }}{{ "\n" }}{{ .Content }}{{ "<|im_end|>\n" }}{{ end -}}
+{{ "<|im_start|>assistant\n" }}
+{{- else -}}
+{{- if .System }}{{ "<|im_start|>system\n" }}{{ .System }}{{ "<|im_end|>\n" }}{{ end -}}
+{{ "<|im_start|>user\n" }}{{ .Prompt }}{{ "<|im_end|>\n<|im_start|>assistant\n" }}
+{{- end }}{{ .Response }}"""
+
+PARAMETER temperature 0.8
+PARAMETER top_p 0.95
+PARAMETER repeat_penalty 1.15
+PARAMETER num_ctx 4096
+PARAMETER num_predict 700
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|endoftext|>"
