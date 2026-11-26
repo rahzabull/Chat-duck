@@ -60,5 +60,3 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
 #focus-badge button:not(.close-button) { margin: 0; }
 #reading-panel header, #productivity-card header, #proactive-actions header { position: sticky; top: -14px; z-index: 1; background: var(--surface-card); padding-bottom: 4px; }
 
-#awareness-eye { position: absolute; right: 24%; bottom: 15%; z-index: 30; width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px solid #567144; background: #fff9df; color: #22351d; cursor: pointer; font-size: 20px; line-height: 28px; pointer-events: auto; }
-#awareness-eye[hidden] { display: none; }

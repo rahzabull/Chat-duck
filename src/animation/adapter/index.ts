@@ -34,5 +34,7 @@ export interface CharacterSurface extends CharacterAnimationAdapter {
   setPaused(active: boolean): void;
   setTalking(active: boolean): void;
   setSunglasses(active: boolean): void;
+  setSpecs(active: boolean): void;
+  glint(): void;
   setDebugHitbox(active: boolean): void;
 }

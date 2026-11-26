@@ -23,7 +23,7 @@ export class FigmaDuck implements CharacterSurface {
   private animation = 'idle'; private emotion = 'neutral'; private conversation: ConversationState | null = null;
   private pose = ''; private direction: 'left' | 'right' = 'right';
   private visible = true; private paused = false; private reduced = false; private disposed = false;
-  private sleeping = false; private dragging = false; private talking = false; private sunglasses = false;
+  private sleeping = false; private dragging = false; private talking = false; private sunglasses = false; private specs = false;
   private sleepAt = 0; private dragAt = 0; private pickups: number[] = []; private dragVariant = 'dragged_up_down';
   private phase = 0; private breath = 0; private landing: 'fallen_a' | 'fallen_b' | null = null;
   private position?: { x: number; y: number }; private fallTop?: number; private fallDistance = 0;
@@ -73,7 +73,7 @@ export class FigmaDuck implements CharacterSurface {
     this.root.classList.toggle('dragging', this.dragging);
     if (pose !== this.pose) { this.pose = pose; this.mountPose(pose); }
     this.propRoot.querySelectorAll<SVGGElement>('[data-prop]').forEach(g => {
-      g.style.display = (g.dataset.prop === 'sunglasses' && this.sunglasses && !this.paused) || (!extra && g.dataset.prop === extraName && !this.paused) ? 'inline' : 'none';
+      g.style.display = (g.dataset.prop === 'sunglasses' && this.sunglasses && !this.paused) || (g.dataset.prop === 'specs' && this.specs && !this.sunglasses && !this.asleep && !this.paused && !pose.startsWith('fallen')) || (!extra && g.dataset.prop === extraName && !this.paused) ? 'inline' : 'none';
     });
     this.propRoot.dataset.activity = selected.activity;
     this.syncTimers();
@@ -241,6 +241,10 @@ export class FigmaDuck implements CharacterSurface {
     if (this.reduced === active) return; this.reduced = active; this.host.classList.toggle('figma-reduced', active); this.syncTimers();
   }
   setTalking(active: boolean): void { if (this.talking !== active) { this.talking = active; this.refresh(); } }
+  /** Screen awareness indicator: Ducky wears little reading glasses while he can look at the front window. */
+  setSpecs(active: boolean): void { if (this.specs !== active) { this.specs = active; this.refresh(); } }
+  /** A capture just happened: a quick glint on the glasses instead of a floating eye. */
+  glint(): void { const g = this.propRoot.querySelector<SVGPathElement>('.specs-glint'); if (!g || !this.specs) return; g.getAnimations().forEach(a => a.cancel()); g.animate([{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }], { duration: 600 }); }
   setSunglasses(active: boolean): void { if (this.sunglasses !== active) { this.sunglasses = active; this.refresh(); } }
   setDebugHitbox(active: boolean): void { this.root.classList.toggle('debug-hitbox', active); }
   hitTest(x: number, y: number): boolean {

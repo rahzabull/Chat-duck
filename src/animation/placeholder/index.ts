@@ -104,6 +104,8 @@ export class PlaceholderDuck implements CharacterSurface {
     this.reduced = active; this.root.classList.toggle('reduced', active);
     if (active) this.stopBreath(); else this.scheduleBreath();
   }
+  setSpecs(_active: boolean): void { /* placeholder has no glasses */ }
+  glint(): void { /* no-op */ }
   setSunglasses(active: boolean): void { this.root.classList.toggle('wearing-sunglasses', active); }
   setTalking(active: boolean): void { this.root.classList.toggle('talking', active); }
   setDebugHitbox(active: boolean): void { this.root.classList.toggle('debug-hitbox', active); }
